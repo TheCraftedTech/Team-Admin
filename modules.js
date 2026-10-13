@@ -297,40 +297,48 @@ registerModule("locate", (ctx) => {
 
 /* ======================================================================
    Modul „memory“ – Minispiel „Störsender“: Muster merken und nachtippen
-   Auf einem Raster (size × size) leuchten dots Tasten mehrmals auf. Danach tippt man genau diese
-   Tasten an (Reihenfolge egal). Bei einem Fehler kommt dieselbe Runde mit neuem Muster.
-   Nach rounds geschafften Runden geht es weiter.
+   Zwei Seiten, beide füllen den Bildschirm ohne Scrollen:
+     1. Anleitung (Markdown) mit Button zum Spiel
+     2. Spiel mit „‹ Anleitung“-Knopf, Raster und Start-Button
+   Auf dem Raster (size × size) leuchten dots Tasten mehrmals auf. Danach tippt man genau diese
+   Tasten an (Reihenfolge egal). Es gilt eine Kombo: rounds Runden hintereinander schaffen –
+   bei einem Fehler beginnt die Kombo von vorne.
+   dots kann eine Zahl oder eine Liste je Runde sein, z. B. [4, 5, 6] (wird schwerer).
    ====================================================================== */
 registerModule("memory", (ctx) => {
   const S = ctx.step;
   const size = S.size ?? 5;
-  const dots = S.dots ?? 5;
   const rounds = S.rounds ?? 3;
   const blinks = S.blinks ?? 2;
   const onMs = S.onMs ?? 500;
   const offMs = S.offMs ?? 280;
   const total = size * size;
+  const dotsFor = (round) => (Array.isArray(S.dots) ? S.dots[Math.min(round, S.dots.length - 1)] : (S.dots ?? 5));
 
-  let solved = clamp(Number(ctx.data.solved) || 0, 0, rounds - 1);   // geschaffte Runden (bleibt nach Neuladen)
-  let phase = "idle";                                                // idle | show | input | fail | done
+  let solved = clamp(Number(ctx.data.solved) || 0, 0, rounds - 1);   // geschaffte Runden der laufenden Kombo
+  let view = "guide";                                               // guide | game
+  let phase = "idle";                                               // idle | show | input | fail | done
   let pattern = new Set();
   let found = new Set();
 
-  /* ----- Zeitgeber, die beim Verlassen des Schritts aufgeräumt werden ----- */
+  /* ----- Zeitgeber, die beim Verlassen aufgeräumt werden ----- */
   const timers = new Set();
   function later(fn, ms) {
     const id = setTimeout(() => { timers.delete(id); fn(); }, ms);
     timers.add(id);
   }
+  function clearTimers() { timers.forEach(clearTimeout); timers.clear(); }
 
-  /* ----- Oberfläche ----- */
-  const parts = [];
-  if (S.md) {
-    const content = h("div", "md");
-    parts.push(content);
-    fillMarkdown(content, S.md);
-  }
+  /* ----- Seite 1: Anleitung ----- */
+  const content = h("div", "md");
+  const toGame = h("button", "go", S.button || "WEITER");
+  toGame.type = "button";
+  const guideView = h("div", "scroller", "", [h("div", "page", "", [content, toGame])]);
+  if (S.md) fillMarkdown(content, S.md);
 
+  /* ----- Seite 2: Spiel ----- */
+  const back = h("button", "back", "‹ ANLEITUNG");
+  back.type = "button";
   const title = h("div", "mem-title");
   const leds = h("div", "dots");
   const status = h("div", "feedback");
@@ -345,19 +353,35 @@ registerModule("memory", (ctx) => {
   });
   const grid = h("div", "mem-grid", "", cells);
   grid.style.setProperty("--n", size);
-  const startBtn = h("button", "go", S.button || "STARTEN");
+  const stage = h("div", "mem-stage", "", [grid]);
+  const startBtn = h("button", "go", S.startLabel || "ANGREIFEN");
   startBtn.type = "button";
-  startBtn.addEventListener("click", () => startRound());
+  const gameView = h("div", "mem-screen", "", [h("div", "mem-top", "", [back, title]), leds, stage, status, startBtn]);
 
-  parts.push(h("div", "mem-box", "", [title, leds, grid, status]), startBtn);
-  ctx.root.append(h("div", "scroller", "", [h("div", "page", "", parts)]));
+  ctx.root.append(guideView, gameView);
+
+  /** Das Raster so groß machen, wie in den freien Platz passt (quadratisch, nie scrollen) */
+  function fitGrid() {
+    const s = Math.floor(Math.min(stage.clientWidth, stage.clientHeight));
+    if (s > 0) { grid.style.width = `${s}px`; grid.style.height = `${s}px`; }
+  }
+  window.addEventListener("resize", fitGrid);
+  const observer = typeof ResizeObserver === "function" ? new ResizeObserver(fitGrid) : null;
+  if (observer) observer.observe(stage);
+
+  function setView(next) {
+    view = next;
+    guideView.hidden = view !== "guide";
+    gameView.hidden = view !== "game";
+    if (view === "game") { requestAnimationFrame(fitGrid); }
+  }
 
   function setStatus(text, kind) {
     status.textContent = text;
     status.className = "feedback" + (kind ? " " + kind : "");
   }
   function renderRounds() {
-    setText(title, `RUNDE ${Math.min(solved + 1, rounds)} / ${rounds}`);
+    setText(title, `KOMBO – RUNDE ${Math.min(solved + 1, rounds)} / ${rounds}`);
     if (leds.children.length !== rounds) leds.replaceChildren(...Array.from({ length: rounds }, () => document.createElement("i")));
     [...leds.children].forEach((d, i) => { d.className = i < solved ? "done" : i === solved ? "now" : ""; });
   }
@@ -370,14 +394,22 @@ registerModule("memory", (ctx) => {
     return a;
   }
 
+  function showIdle() {
+    clearTimers();
+    phase = "idle";
+    resetCells();
+    startBtn.hidden = false;
+    renderRounds();
+    setStatus("BEREIT");
+  }
+
   /* ----- Ablauf einer Runde ----- */
   function startRound() {
-    timers.forEach(clearTimeout);
-    timers.clear();
+    clearTimers();
     phase = "show";
     startBtn.hidden = true;
     found = new Set();
-    pattern = new Set(shuffled(total).slice(0, dots));
+    pattern = new Set(shuffled(total).slice(0, dotsFor(solved)));
     resetCells();
     renderRounds();
     setStatus("MUSTER EINPRÄGEN …");
@@ -392,7 +424,7 @@ registerModule("memory", (ctx) => {
     later(() => {
       phase = "input";
       cells.forEach((c) => { c.disabled = false; });
-      setStatus(`MUSTER EINGEBEN (0 / ${dots})`);
+      setStatus(`MUSTER EINGEBEN (0 / ${pattern.size})`);
     }, t);
   }
 
@@ -403,7 +435,7 @@ registerModule("memory", (ctx) => {
       found.add(i);
       cells[i].classList.add("ok");
       cells[i].disabled = true;
-      if (found.size < dots) { setStatus(`MUSTER EINGEBEN (${found.size} / ${dots})`); return; }
+      if (found.size < pattern.size) { setStatus(`MUSTER EINGEBEN (${found.size} / ${pattern.size})`); return; }
 
       solved += 1;
       ctx.data.solved = solved;
@@ -423,20 +455,32 @@ registerModule("memory", (ctx) => {
       return;
     }
 
-    // Falsche Taste: die übersehenen Tasten kurz zeigen, dann dieselbe Runde mit neuem Muster
+    // Falsche Taste: übersehene Tasten kurz zeigen, die Kombo beginnt von vorne
     phase = "fail";
     cells[i].classList.add("bad");
     pattern.forEach((p) => { if (!found.has(p)) cells[p].classList.add("miss"); });
     cells.forEach((c) => { c.disabled = true; });
-    setStatus("FALSCH – NEUES MUSTER KOMMT …", "err");
-    later(startRound, 1700);
+    solved = 0;
+    ctx.data.solved = 0;
+    ctx.save();
+    renderRounds();
+    setStatus("FALSCH – DIE KOMBO BEGINNT VON VORNE …", "err");
+    later(startRound, 1900);
   }
 
-  renderRounds();
-  setStatus("BEREIT");
+  toGame.addEventListener("click", () => { setView("game"); showIdle(); });
+  back.addEventListener("click", () => { showIdle(); setView("guide"); });
+  startBtn.addEventListener("click", startRound);
+
+  setView("guide");
+  showIdle();
 
   return {
-    destroy() { timers.forEach(clearTimeout); timers.clear(); },
-    info: () => ({ type: "memory", phase, solved, rounds, pattern: [...pattern], found: [...found] })
+    destroy() {
+      clearTimers();
+      window.removeEventListener("resize", fitGrid);
+      if (observer) observer.disconnect();
+    },
+    info: () => ({ type: "memory", view, phase, solved, rounds, pattern: [...pattern], found: [...found] })
   };
 });

@@ -7,9 +7,11 @@
      locate    Ortungs-Radar zu einem Ort.       Felder: lat, lng, radius, maxAccuracy, fixes
                (ein Ort = ein Schritt; „WEITER“ erscheint erst am Ort)
      password  Eingabefeld für ein Passwort.     Felder: md (Text darüber), placeholder, answers[], button
-     memory    Minispiel: Muster merken und nachtippen.
-                                                 Felder: md (Text darüber), button, size (Raster, 5 = 5×5), dots (leuchtende Tasten),
-                                                 rounds (Runden), blinks (wie oft das Muster blinkt), onMs, offMs (Blinktempo)
+     memory    Minispiel: Muster merken und nachtippen (Seite 1 Anleitung, Seite 2 Spiel – ohne Scrollen).
+                                                 Felder: md (Anleitung), button (Anleitung → Spiel), startLabel (Start im Spiel),
+                                                 size (Raster, 5 = 5×5), dots (leuchtende Tasten; Zahl oder Liste je Runde, z. B. [4, 5, 6]),
+                                                 rounds (Runden hintereinander; ein Fehler = Kombo von vorne),
+                                                 blinks (wie oft das Muster blinkt), onMs, offMs (Blinktempo)
      end       Abschlussseite.                   Felder: md
 
    Gemeinsame Felder: id (eindeutig, unter ihr wird der Fortschritt gespeichert) und
@@ -49,7 +51,7 @@ const STEPS = [
   { id: "ort3", type: "locate", title: "Ort 3", lat: 47.760105831192874, lng: 8.839979882181922 },
   { id: "ort4", type: "locate", title: "Ort 4", lat: 47.76058112053592,  lng: 8.841501782310322 },
 
-  { id: "stoersender", type: "memory", title: "Minispiel: Störsender", md: "d027c79e", button: "STÖRSENDER ANGREIFEN", size: 5, dots: 5, rounds: 3 },
+  { id: "stoersender", type: "memory", title: "Minispiel: Störsender", md: "d027c79e", button: "ZUM SPIEL", startLabel: "STÖRSENDER ANGREIFEN", size: 5, dots: 5, rounds: 3 },
 
   { id: "ort5", type: "locate", title: "Ort 5", lat: 47.76114913914456,  lng: 8.841115675526469 },
   { id: "ort6", type: "locate", title: "Ort 6", lat: 47.76170564732148,  lng: 8.842634771566102 },
