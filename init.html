@@ -2,144 +2,172 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <title>Einrichtung</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>Berechtigungen</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#030307">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="robots" content="noindex">
 
   <style>
-    :root { --bg: #030307; --green: #00ff66; --cyan: #00f0ff; --red: #ff3b5c; --amber: #ffb020; --muted: #4f7a68; }
-    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    html, body {
-      height: 100%; background: var(--bg); color: var(--green);
-      font-family: "Courier New", ui-monospace, Menlo, Consolas, monospace;
-      overflow: hidden; user-select: none; -webkit-user-select: none;
-    }
-    body {
-      height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px;
-      padding: calc(env(safe-area-inset-top) + 20px) 24px calc(env(safe-area-inset-bottom) + 20px);
-      background: radial-gradient(circle at 50% 35%, rgba(0, 255, 102, 0.10), transparent 60%), var(--bg);
-    }
-    body::after {
-      content: ""; position: fixed; inset: 0; pointer-events: none;
-      background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 3px);
-    }
+    :root { --bg: #030307; --green: #00ff66; --cyan: #00f0ff; --red: #ff3b5c; --amber: #ffb020; --muted: #7c9a8d; --line: #1b2a24; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: var(--bg); color: #d6efe3; font-family: "Courier New", ui-monospace, Menlo, Consolas, monospace; }
+    body { max-width: 560px; margin: 0 auto; padding: calc(env(safe-area-inset-top) + 18px) 16px calc(env(safe-area-inset-bottom) + 24px); }
 
-    .scope { position: relative; width: min(52vw, 220px); aspect-ratio: 1; border-radius: 50%; border: 2px solid var(--green); box-shadow: 0 0 24px rgba(0, 255, 102, 0.45), inset 0 0 30px rgba(0, 255, 102, 0.2); overflow: hidden; }
-    .scope::before { content: ""; position: absolute; inset: 0; background: repeating-radial-gradient(circle, transparent 0 26px, rgba(0, 255, 102, 0.28) 26px 27px); }
-    .scope::after { content: ""; position: absolute; inset: 0; background: conic-gradient(from 0deg, rgba(0, 255, 102, 0.55), rgba(0, 255, 102, 0) 22%, transparent); animation: spin 2.4s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    h1 { font-size: 18px; color: var(--green); letter-spacing: 1px; margin-bottom: 4px; }
+    .sub { font-size: 13px; color: var(--muted); margin-bottom: 18px; line-height: 1.5; }
 
-    .checks { list-style: none; width: min(100%, 360px); display: flex; flex-direction: column; gap: 10px; }
-    .checks li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 14px; border: 1px solid rgba(0, 255, 102, 0.28); border-radius: 8px; font-size: 13px; letter-spacing: 1.5px; }
-    .checks .v { font-weight: bold; text-align: right; }
-    .checks li[data-state="wait"] .v { color: var(--cyan); animation: blink 1s steps(2) infinite; }
-    .checks li[data-state="ok"] .v { color: var(--green); text-shadow: 0 0 8px rgba(0, 255, 102, 0.7); }
-    .checks li[data-state="err"] { border-color: var(--red); }
-    .checks li[data-state="err"] .v { color: var(--red); }
-    .checks li[data-state="warn"] .v { color: var(--amber); }
-    @keyframes blink { 50% { opacity: 0.25; } }
+    ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
+    .info { flex: 1 1 100%; }
+    .info b { display: block; font-size: 15px; }
+    .detail { display: block; margin-top: 3px; font-size: 12px; line-height: 1.45; color: var(--muted); }
+    .status { flex: 1; font-weight: bold; font-size: 14px; letter-spacing: 1px; }
+    li[data-state="ok"]   .status { color: var(--green); }
+    li[data-state="err"]  .status { color: var(--red); }
+    li[data-state="warn"] .status { color: var(--amber); }
+    li[data-state="wait"] .status { color: var(--cyan); }
+    li[data-state="err"] { border-color: #5a2431; }
 
-    .msg { min-height: 4.2em; width: min(100%, 360px); text-align: center; font-size: 14px; line-height: 1.5; letter-spacing: 1px; color: var(--cyan); }
-    .msg.err { color: var(--red); }
-    .msg.ok { color: var(--green); }
-    .msg.tap { animation: blink 1.2s steps(2) infinite; }
+    button, .btn {
+      font: inherit; font-size: 14px; color: var(--green); background: transparent;
+      border: 1px solid var(--green); border-radius: 6px; padding: 10px 14px; cursor: pointer;
+      text-decoration: none; text-align: center;
+    }
+    button:active, .btn:active { background: rgba(0, 255, 102, 0.15); }
+    button:disabled { opacity: 0.45; }
+    li button { min-width: 128px; }
+
+    .actions { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+    .actions .btn.primary { background: rgba(0, 255, 102, 0.14); font-weight: bold; padding: 14px; }
+    .actions .btn.disabled { opacity: 0.35; pointer-events: none; }
+    .secure { margin-top: 16px; font-size: 12px; color: var(--muted); }
+    .secure.bad { color: var(--red); }
   </style>
 </head>
 <body>
-  <div class="scope" aria-hidden="true"></div>
+  <h1>BERECHTIGUNGEN</h1>
+  <p class="sub">Das Radar braucht Zugriff auf die folgenden Dinge. Wird beim Öffnen automatisch abgefragt – mit „Neu fragen“ kannst du jede Abfrage wiederholen.</p>
 
-  <ul class="checks">
-    <li id="r-geo"     data-state="wait"><span>ORTUNG (GPS)</span>      <span class="v">…</span></li>
-    <li id="r-compass" data-state="wait"><span>KOMPASS</span>           <span class="v">…</span></li>
-    <li id="r-motion"  data-state="wait"><span>BEWEGUNGSSENSOREN</span> <span class="v">…</span></li>
-    <li id="r-wake"    data-state="wait"><span>DISPLAY-SPERRE</span>    <span class="v">…</span></li>
+  <ul>
+    <li id="r-geo" data-state="wait">
+      <div class="info"><b>Standort (GPS)</b><span class="detail"></span></div>
+      <span class="status">PRÜFE …</span>
+      <button type="button" data-ask="geo">Neu fragen</button>
+    </li>
+    <li id="r-compass" data-state="wait">
+      <div class="info"><b>Kompass / Ausrichtung</b><span class="detail"></span></div>
+      <span class="status">PRÜFE …</span>
+      <button type="button" data-ask="compass">Neu fragen</button>
+    </li>
+    <li id="r-motion" data-state="wait">
+      <div class="info"><b>Bewegungssensoren</b><span class="detail"></span></div>
+      <span class="status">PRÜFE …</span>
+      <button type="button" data-ask="motion">Neu fragen</button>
+    </li>
+    <li id="r-wake" data-state="wait">
+      <div class="info"><b>Display-Sperre</b><span class="detail"></span></div>
+      <span class="status">PRÜFE …</span>
+      <button type="button" data-ask="wake">Neu fragen</button>
+    </li>
   </ul>
 
-  <div class="msg" id="msg" role="status"></div>
+  <div class="actions">
+    <button type="button" id="all">Alles neu initialisieren</button>
+    <a class="btn primary disabled" id="go" href="index.html" aria-disabled="true">Weiter zum Radar</a>
+  </div>
+
+  <p class="secure" id="secure"></p>
 
   <script>
   "use strict";
 
   /* ======================================================================
-     init.html – fordert beim Laden automatisch alle Berechtigungen an
-     und leitet danach zur index.html weiter.
-
-     Hinweis zu iOS: Safari erlaubt die Kompass-/Bewegungs-Abfrage nur nach einer Berührung des
-     Displays. Dann erscheint "BILDSCHIRM ANTIPPEN" – ein Tipp irgendwo reicht.
-     Android/Chrome braucht das nicht.
+     init.html – zeigt, welche Zugriffe das Radar braucht, ob sie aktiv sind,
+     und fragt sie beim Laden automatisch an. „Neu fragen“ wiederholt die
+     Abfrage per Klick (nur so erlaubt Safari/iOS die Sensor-Freigabe).
      ====================================================================== */
 
   const $ = (id) => document.getElementById(id);
-  const REDIRECT_DELAY_MS = 1000;
 
-  function setRow(key, state, text) {
+  function setRow(key, state, text, detail) {
     const row = $("r-" + key);
     row.dataset.state = state;
-    row.querySelector(".v").textContent = text;
-  }
-  function setMsg(text, kind) {
-    const m = $("msg");
-    m.textContent = text;
-    m.className = "msg" + (kind ? " " + kind : "");
+    row.querySelector(".status").textContent = text;
+    row.querySelector(".detail").textContent = detail || "";
   }
 
-  /* Ein Tipp aufs Display (nötig für iOS-Sensor-Freigabe oder zum erneuten Versuch) */
-  let tapAction = null;
-  document.addEventListener("click", () => {
-    const f = tapAction;
-    tapAction = null;
-    if (f) f();
-  });
+  /* ---------- Weiter-Button: erst aktiv, wenn der Standort funktioniert ---------- */
+  let geoOk = false;
+  function setGeoOk(ok) {
+    geoOk = ok;
+    const go = $("go");
+    go.classList.toggle("disabled", !ok);
+    go.setAttribute("aria-disabled", String(!ok));
+    if (ok) { try { sessionStorage.setItem("radar.initDone", "1"); } catch (e) { /* ignorieren */ } }
+  }
+  $("go").addEventListener("click", (e) => { if (!geoOk) e.preventDefault(); });
 
-  /* ---------- 1) Standort ---------- */
-  async function checkGeo() {
-    if (!navigator.geolocation) { setRow("geo", "err", "NICHT VERFÜGBAR"); return false; }
+  /* ---------- Standort ---------- */
+  let geoBusy = false;
 
-    let state = "unknown";
-    try { state = (await navigator.permissions.query({ name: "geolocation" })).state; } catch (e) { /* nicht unterstützt */ }
-    if (state === "denied") { setRow("geo", "err", "BLOCKIERT"); return false; }
-
-    const opts = { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 };
-
-    if (state === "granted") {
-      // Schon erlaubt: GPS im Hintergrund „aufwärmen“, damit der erste Fix in der Radar-Ansicht schneller kommt
-      navigator.geolocation.getCurrentPosition(() => {}, () => {}, opts);
-      setRow("geo", "ok", "OK");
-      return true;
-    }
-
-    setRow("geo", "wait", "BITTE ERLAUBEN");
-    return new Promise((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        () => { setRow("geo", "ok", "OK"); resolve(true); },
-        (err) => {
-          if (err.code === 1) { setRow("geo", "err", "BLOCKIERT"); resolve(false); }
-          else { setRow("geo", "ok", "OK · NOCH KEIN SIGNAL"); resolve(true); }   // erlaubt, nur gerade kein Fix
-        },
-        opts
-      );
-    });
+  async function geoPermissionState() {
+    try { return (await navigator.permissions.query({ name: "geolocation" })).state; } catch (e) { return "unknown"; }
   }
 
-  /* ---------- 2) Display-Sperre ---------- */
-  async function checkWake() {
-    if (!("wakeLock" in navigator)) { setRow("wake", "warn", "NICHT UNTERSTÜTZT"); return; }
+  const GEO_BLOCKED_HELP =
+    "Der Browser hat den Standort für diese Seite gesperrt. Öffne die Website-Einstellungen (Schloss-Symbol neben der Adresse → Berechtigungen → Standort → Erlauben). " +
+    "iPhone: Einstellungen → Safari → Standort. Danach hier „Neu fragen“.";
+
+  async function askGeo() {
+    if (geoBusy) return;
+    geoBusy = true;
     try {
-      const lock = await navigator.wakeLock.request("screen");
-      await lock.release();
-      setRow("wake", "ok", "OK");
-    } catch (e) {
-      setRow("wake", "warn", "BEI BERÜHRUNG");
+      if (!navigator.geolocation) { setRow("geo", "err", "NICHT VERFÜGBAR", "Dieses Gerät/dieser Browser unterstützt keine Ortung."); setGeoOk(false); return; }
+      if (!window.isSecureContext) { setRow("geo", "err", "NICHT AKTIV", "Ortung funktioniert nur über eine sichere Verbindung (https://)."); setGeoOk(false); return; }
+
+      setRow("geo", "wait", "FRAGT …", "Bitte die Anfrage des Browsers mit „Erlauben“ bestätigen.");
+      const result = await new Promise((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          (p) => resolve({ ok: true, p }),
+          (err) => resolve({ ok: false, err }),
+          { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+        );
+      });
+
+      if (result.ok) {
+        setRow("geo", "ok", "AKTIV", `Position empfangen (Genauigkeit ±${Math.round(result.p.coords.accuracy)} m).`);
+        setGeoOk(true);
+      } else if (result.err.code === 1) {
+        setRow("geo", "err", "BLOCKIERT", GEO_BLOCKED_HELP);
+        setGeoOk(false);
+      } else {
+        // Erlaubt, aber noch kein GPS-Fix (Timeout) oder Ortungsdienste des Handys sind aus
+        const state = await geoPermissionState();
+        const granted = state === "granted" || state === "unknown";
+        setRow("geo", granted ? "warn" : "err", granted ? "ERLAUBT, KEIN SIGNAL" : "NICHT AKTIV",
+          "Noch keine Position. Ins Freie gehen und prüfen, ob die Ortungsdienste des Handys eingeschaltet sind.");
+        setGeoOk(granted);
+      }
+    } finally {
+      geoBusy = false;
     }
   }
 
-  /* ---------- 3) Kompass & Bewegung ---------- */
+  /* ---------- Kompass & Bewegungssensoren ---------- */
   const hasPermissionApi =
     typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function";
+
+  /** Fragt Ausrichtung + Bewegung an. Ergebnis je Eintrag: "ok" | "denied" | "gesture" (Safari: Klick nötig) */
+  function requestOrientationPermissions() {
+    const reqs = [DeviceOrientationEvent.requestPermission()];
+    if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
+      reqs.push(DeviceMotionEvent.requestPermission());
+    }
+    return Promise.all(reqs.map((p) => p.then(
+      (r) => (r === "granted" ? "ok" : "denied"),
+      (e) => (e && e.name === "NotAllowedError" ? "gesture" : "denied")
+    )));
+  }
 
   /** Wartet auf ein passendes Event; true, wenn innerhalb von ms etwas ankommt */
   function probeEvent(types, test, ms = 1500) {
@@ -157,7 +185,6 @@
       const timer = setTimeout(() => finish(false), ms);
     });
   }
-
   const probeCompass = () => probeEvent(
     ["deviceorientationabsolute", "deviceorientation"],
     (e) => typeof e.webkitCompassHeading === "number" || (e.alpha !== null && e.alpha !== undefined && e.absolute === true)
@@ -166,8 +193,7 @@
     ["devicemotion"],
     (e) => e.accelerationIncludingGravity && e.accelerationIncludingGravity.x !== null
   );
-
-  /** Chrome/Android: Generic Sensor API (Magnetometer + Gyro + Beschleunigung) anfordern */
+  /** Chrome/Android: Generic Sensor API (Magnetometer + Gyro + Beschleunigung) */
   function probeSensorApi(ms = 1500) {
     return new Promise((resolve) => {
       if (!("AbsoluteOrientationSensor" in window)) { resolve(false); return; }
@@ -183,91 +209,96 @@
     });
   }
 
-  function showSensorResult(compass, motion) {
-    setRow("compass", compass ? "ok" : "warn", compass ? "OK" : "NICHT VERFÜGBAR");
-    setRow("motion", motion ? "ok" : "warn", motion ? "OK" : "NICHT VERFÜGBAR");
-  }
+  let sensorsBusy = false;
 
-  /** Fragt Ausrichtung + Bewegung an. Ergebnis je Eintrag: "ok" | "denied" | "gesture" (Safari: Tipp nötig) */
-  function requestOrientationPermissions() {
-    const reqs = [DeviceOrientationEvent.requestPermission()];
-    if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
-      reqs.push(DeviceMotionEvent.requestPermission());
-    }
-    return Promise.all(reqs.map((p) => p.then(
-      (r) => (r === "granted" ? "ok" : "denied"),
-      (e) => (e && e.name === "NotAllowedError" ? "gesture" : "denied")
-    )));
-  }
+  async function askSensors() {
+    if (sensorsBusy) return;
+    sensorsBusy = true;
+    // WICHTIG für Safari: die Abfrage muss synchron im Klick starten (vor jedem await)
+    const permPromise = hasPermissionApi ? requestOrientationPermissions() : Promise.resolve(["ok"]);
+    try {
+      ["compass", "motion"].forEach((k) => setRow(k, "wait", "FRAGT …", "Falls eine Anfrage erscheint, bitte erlauben."));
 
-  async function checkSensors() {
-    let perm = ["ok"];
-
-    if (hasPermissionApi) {
-      // Chrome beantwortet das sofort, Safari verlangt eine Berührung des Displays
-      perm = await requestOrientationPermissions();
-
-      if (perm.includes("gesture")) {
-        // Evtl. in dieser Sitzung schon freigegeben → Events kommen auch ohne Tipp
-        const [c] = await Promise.all([probeCompass(), probeMotion()]);
-        if (c) {
-          perm = ["ok"];
-        } else {
-          setRow("compass", "wait", "TIPPEN");
-          setRow("motion", "wait", "TIPPEN");
-          perm = await new Promise((resolve) => {
-            // Direkt im Tipp anfragen (Safari verlangt die Nutzer-Geste)
-            tapAction = () => resolve(requestOrientationPermissions());
-          });
-        }
-      }
-
-      if (perm.includes("denied") || perm.includes("gesture")) {
-        setRow("compass", "err", "ABGELEHNT");
-        setRow("motion", "err", "ABGELEHNT");
-        setMsg("KOMPASS ABGELEHNT – DIE RICHTUNG KOMMT DANN AUS DER GEHRICHTUNG.", "err");
+      if (!window.isSecureContext) {
+        const msg = "Sensoren funktionieren nur über eine sichere Verbindung (https://).";
+        setRow("compass", "err", "NICHT AKTIV", msg);
+        setRow("motion", "err", "NICHT AKTIV", msg);
         return;
       }
-    }
 
-    // Prüfen, ob wirklich Messwerte ankommen (Chrome/Android: zusätzlich die Generic-Sensor-API anfordern)
-    const [compassEvents, sensorApi, motion] = await Promise.all([probeCompass(), probeSensorApi(), probeMotion()]);
-    showSensorResult(compassEvents || sensorApi, motion || sensorApi);
+      const perm = await permPromise;
+
+      if (perm.includes("gesture")) {
+        const msg = "Safari erlaubt die Abfrage nur nach einer Berührung: Bitte „Neu fragen“ tippen.";
+        setRow("compass", "err", "NICHT AKTIV", msg);
+        setRow("motion", "err", "NICHT AKTIV", msg);
+        return;
+      }
+      if (perm.includes("denied")) {
+        const msg = "Zugriff abgelehnt. iPhone: Einstellungen → Safari → „Bewegung & Ausrichtung“ erlauben (oder Website-Daten löschen), dann „Neu fragen“. Ohne Kompass nutzt das Radar die Gehrichtung.";
+        setRow("compass", "err", "BLOCKIERT", msg);
+        setRow("motion", "err", "BLOCKIERT", msg);
+        return;
+      }
+
+      // Prüfen, ob wirklich Messwerte ankommen
+      const [compassEvents, sensorApi, motion] = await Promise.all([probeCompass(), probeSensorApi(), probeMotion()]);
+      const noData = "Keine Messwerte vom Gerät (am Computer normal). Das Radar nutzt dann die Gehrichtung aus dem GPS.";
+      if (compassEvents || sensorApi) setRow("compass", "ok", "AKTIV", sensorApi ? "Quelle: Sensor-API (Magnetometer + Gyro)." : "Quelle: Ausrichtungs-Sensor.");
+      else setRow("compass", "warn", "KEINE DATEN", noData);
+      if (motion || sensorApi) setRow("motion", "ok", "AKTIV", "Beschleunigung/Drehung werden gemessen.");
+      else setRow("motion", "warn", "KEINE DATEN", noData);
+    } finally {
+      sensorsBusy = false;
+    }
   }
 
-  /* ---------- Ablauf ---------- */
-  let running = false;
-
-  async function run() {
-    if (running) return;
-    running = true;
-    setMsg("SYSTEM WIRD EINGERICHTET …");
-    ["geo", "compass", "motion", "wake"].forEach((k) => setRow(k, "wait", "…"));
-
-    const geoTask = checkGeo();
-    const wakeTask = checkWake();
-    const sensorTask = checkSensors();
-    // Nur Safari/iOS: Kompass-Freigabe braucht einen Tipp aufs Display
-    if (hasPermissionApi) setTimeout(() => {
-      if (tapAction && $("r-compass").dataset.state === "wait") setMsg("BILDSCHIRM ANTIPPEN, UM DEN KOMPASS FREIZUGEBEN", "tap");
-    }, 1700);
-
-    const geoOk = await geoTask;
-    if (!geoOk) {
-      setMsg("STANDORT BLOCKIERT. Bitte in den Browser-Einstellungen für diese Seite „Standort“ erlauben. Danach Bildschirm antippen.", "err");
-      running = false;
-      tapAction = run;                                     // erneuter Versuch per Tipp
+  /* ---------- Display-Sperre ---------- */
+  async function askWake() {
+    if (!("wakeLock" in navigator)) {
+      setRow("wake", "warn", "NICHT UNTERSTÜTZT", "Bitte in den Handy-Einstellungen den Display-Timeout verlängern, damit der Bildschirm nicht ausgeht.");
       return;
     }
-
-    await Promise.all([wakeTask, sensorTask]);
-
-    setMsg("SYSTEM BEREIT", "ok");
-    try { sessionStorage.setItem("radar.initDone", "1"); } catch (e) { /* ignorieren */ }
-    setTimeout(() => location.replace("index.html"), REDIRECT_DELAY_MS);
+    setRow("wake", "wait", "FRAGT …", "");
+    try {
+      const lock = await navigator.wakeLock.request("screen");
+      await lock.release();
+      setRow("wake", "ok", "AKTIV", "Das Display bleibt in der Radar-Ansicht eingeschaltet.");
+    } catch (e) {
+      setRow("wake", "err", "NICHT AKTIV", "Der Browser hat die Anfrage abgelehnt (Energiesparmodus?). „Neu fragen“ versucht es noch einmal.");
+    }
   }
 
-  run();
+  /* ---------- Bedienung ---------- */
+  const ASK = { geo: askGeo, compass: askSensors, motion: askSensors, wake: askWake };
+  document.querySelectorAll("[data-ask]").forEach((btn) =>
+    btn.addEventListener("click", () => ASK[btn.dataset.ask]()));
+
+  // Safari: Sensor-Abfrage zuerst starten, solange die Nutzer-Geste noch frisch ist
+  $("all").addEventListener("click", () => { askSensors(); askGeo(); askWake(); });
+
+  /* ---------- Start: beim Laden automatisch alles abfragen ---------- */
+  async function autoStart() {
+    const sec = $("secure");
+    sec.textContent = window.isSecureContext
+      ? "Verbindung: sicher (https) ✔"
+      : "Verbindung: NICHT sicher – Standort und Sensoren funktionieren nur über https://";
+    sec.classList.toggle("bad", !window.isSecureContext);
+
+    // Standort-Status sofort anzeigen und bei Änderung (z. B. in den Einstellungen erlaubt) nachziehen
+    const state = await geoPermissionState();
+    if (state === "denied") { setRow("geo", "err", "BLOCKIERT", GEO_BLOCKED_HELP); setGeoOk(false); }
+    else askGeo();
+
+    try {
+      const status = await navigator.permissions.query({ name: "geolocation" });
+      status.addEventListener("change", () => { if (status.state === "denied") { setRow("geo", "err", "BLOCKIERT", GEO_BLOCKED_HELP); setGeoOk(false); } else askGeo(); });
+    } catch (e) { /* nicht unterstützt */ }
+
+    askSensors();
+    askWake();
+  }
+  autoStart();
   </script>
 </body>
 </html>
