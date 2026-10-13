@@ -2,71 +2,515 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <title>Schnitzel.Art – Alien-Rallye</title>
-
-  <!-- ===== PWA / Mobile-Meta ===== -->
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0a0a12">
-  <meta name="description" content="Interaktive Stadtrallye: Verteidige die Erde gegen die Alien-Invasion!">
+  <title>Alien-Radar</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#030307">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Alien-Rallye">
+  <meta name="apple-mobile-web-app-title" content="Alien-Radar">
 
-  <!-- Zum Aktivieren der Offline-Fähigkeit (Dateien siehe Anleitung):
-  <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="icons/icon-192.png">
-  -->
+  <style>
+    :root {
+      --bg: #030307;
+      --green: #00ff66;
+      --cyan: #00f0ff;
+      --red: #ff3b5c;
+      --muted: #4f7a68;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    [hidden] { display: none !important; }
 
-  <link rel="stylesheet" href="style.css">
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--green);
+      font-family: "Courier New", ui-monospace, Menlo, Consolas, monospace;
+      overflow: hidden;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body {
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      padding: calc(env(safe-area-inset-top) + 10px) 16px calc(env(safe-area-inset-bottom) + 10px);
+    }
+    /* feine Scanlines */
+    body::after {
+      content: "";
+      position: fixed; inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 3px);
+    }
+
+    /* ---------- Kopfzeile ---------- */
+    .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
+    .wp { font-size: 15px; letter-spacing: 2px; text-shadow: 0 0 8px rgba(0, 255, 102, 0.6); }
+    .wp small { display: block; font-size: 11px; color: var(--muted); letter-spacing: 3px; text-shadow: none; }
+    .steps { display: flex; gap: 6px; }
+    .steps i { width: 12px; height: 12px; border: 1px solid var(--green); border-radius: 2px; opacity: 0.45; }
+    .steps i.done { background: var(--green); opacity: 1; box-shadow: 0 0 8px var(--green); }
+    .steps i.now { border-color: var(--cyan); opacity: 1; animation: blink 1s steps(2) infinite; }
+    .wake { font-size: 11px; color: var(--muted); }
+    .wake.on { color: var(--green); }
+    .wake.bad { color: var(--red); }
+    @keyframes blink { 50% { opacity: 0.15; } }
+
+    /* ---------- Radar ---------- */
+    .stage { flex: 1; min-height: 0; }
+    #radar { display: block; width: 100%; height: 100%; }
+
+    /* ---------- Fußzeile ---------- */
+    .bottom { text-align: center; padding-top: 6px; min-height: 120px; }
+    .dist {
+      font-size: clamp(44px, 16vw, 76px);
+      font-weight: bold;
+      line-height: 1.05;
+      color: var(--cyan);
+      text-shadow: 0 0 16px rgba(0, 240, 255, 0.7);
+    }
+    .status { margin-top: 6px; font-size: 15px; min-height: 1.4em; }
+    .status.err { color: var(--red); }
+    .info { margin-top: 4px; font-size: 11px; color: var(--muted); letter-spacing: 1px; min-height: 1.2em; }
+
+    /* ---------- Meldungen ---------- */
+    .toast {
+      position: fixed; left: 50%; top: 22%;
+      transform: translate(-50%, -10px);
+      padding: 12px 20px;
+      border: 1px solid var(--green);
+      background: rgba(3, 3, 7, 0.92);
+      box-shadow: 0 0 24px rgba(0, 255, 102, 0.55);
+      font-size: 16px; letter-spacing: 2px; white-space: nowrap;
+      opacity: 0; pointer-events: none; z-index: 5;
+    }
+    .toast.show { animation: toast 2.8s ease-out; }
+    @keyframes toast {
+      0% { opacity: 0; transform: translate(-50%, -10px); }
+      12%, 80% { opacity: 1; transform: translate(-50%, 0); }
+      100% { opacity: 0; }
+    }
+
+    .end {
+      position: fixed; inset: 0; z-index: 4;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+      text-align: center; padding: 24px;
+      background: rgba(3, 3, 7, 0.78);
+    }
+    .end h1 { font-size: clamp(28px, 9vw, 44px); letter-spacing: 4px; color: var(--green); animation: glow 2s ease-in-out infinite alternate; }
+    .end p { color: var(--cyan); letter-spacing: 2px; }
+    @keyframes glow { to { text-shadow: 0 0 22px var(--green), 0 0 44px var(--cyan); } }
+
+    .hint {
+      position: fixed; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom) + 4px);
+      text-align: center; font-size: 11px; color: var(--cyan); letter-spacing: 2px;
+      animation: blink 1.4s steps(2) infinite; z-index: 3;
+    }
+    .dbg {
+      position: fixed; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 12px); z-index: 6;
+      font: inherit; font-size: 12px; color: var(--red); background: transparent;
+      border: 1px solid var(--red); padding: 6px 10px; border-radius: 6px;
+    }
+  </style>
 </head>
 <body>
-  <div class="radar" aria-hidden="true"></div>
-  <div class="scanlines" aria-hidden="true"></div>
-
-  <header class="topbar">
-    <div class="brand">
-      <span class="brand-dot"></span>
-      <span class="brand-text">SCHNITZEL<span>.</span>ART</span>
-    </div>
-    <div class="topbar-right">
-      <span id="wakeStatus" class="wake" data-state="off">○ WACH</span>
-      <span class="score" title="Punkte">◈ <b id="score">0</b></span>
-      <button id="soundBtn" class="icon-btn" aria-label="Ton an/aus" title="Ton an/aus">♪</button>
-    </div>
+  <header class="top">
+    <div class="wp" id="wpName">…</div>
+    <div class="steps" id="steps" aria-label="Fortschritt"></div>
+    <span class="wake" id="wake" title="Display-Sperre">○</span>
   </header>
 
-  <section class="progress" aria-label="Fortschritt">
-    <div class="progress-label">
-      <span id="progressText">STATION 0 / 0</span>
-      <span id="progressPct">0%</span>
-    </div>
-    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
-  </section>
+  <main class="stage"><canvas id="radar" aria-label="Radar"></canvas></main>
 
-  <main id="app" aria-live="polite"></main>
-
-  <footer class="footer">
-    <div class="artifacts" id="artifacts" aria-label="Gesammelte Artefakte"></div>
-    <div class="debug-bar" id="debugBar" hidden>
-      <span>DEBUG</span>
-      <button id="dbgPrev" class="link-btn" type="button">⏮ zurück</button>
-      <button id="dbgSkip" class="link-btn" type="button">⏭ überspringen</button>
-    </div>
-    <button id="resetBtn" class="link-btn" type="button">&gt; Spiel zurücksetzen</button>
+  <footer class="bottom">
+    <div class="dist" id="dist">– – –</div>
+    <div class="status" id="status">SUCHE GPS-SIGNAL …</div>
+    <div class="info" id="info"></div>
   </footer>
 
-  <!-- Scanner-Overlay (wird beim Prüfen der Antwort eingeblendet) -->
-  <div class="scanner" id="scanner" hidden>
-    <div class="scanner-box">
-      <div class="scanner-line"></div>
-      <p id="scannerText">SCAN LÄUFT…</p>
-    </div>
+  <div class="toast" id="toast" role="status"></div>
+
+  <div class="end" id="end" hidden>
+    <h1>ZIEL ERREICHT</h1>
+    <p>MARKTWEIBER LOKALISIERT</p>
+    <p>Die Erde ist gerettet.</p>
   </div>
 
-  <script src="lib.js"></script>
-  <script src="stations.js"></script>
-  <script src="types.js"></script>
-  <script src="script.js"></script>
+  <div class="hint" id="hint" hidden>TIPPEN, UM DEN KOMPASS ZU AKTIVIEREN</div>
+  <button class="dbg" id="dbg" type="button" hidden>⏭ Wegpunkt überspringen</button>
+
+  <script>
+  "use strict";
+
+  /* ======================================================================
+     ROUTE – hier die Wegpunkte anpassen (Reihenfolge = Reihenfolge der Jagd)
+     ====================================================================== */
+  const WAYPOINTS = [
+    { name: "TURM VI",      tag: "START",     lat: 47.758796076746,   lng: 8.83948384873872 },
+    { name: "WEGPUNKT 2",   tag: "SIGNAL",    lat: 47.759442881868516, lng: 8.8405967427222 },
+    { name: "WEGPUNKT 3",   tag: "SIGNAL",    lat: 47.760105831192874, lng: 8.839979882181922 },
+    { name: "WEGPUNKT 4",   tag: "SIGNAL",    lat: 47.76058112053592,  lng: 8.841501782310322 },
+    { name: "WEGPUNKT 5",   tag: "SIGNAL",    lat: 47.76114913914456,  lng: 8.841115675526469 },
+    { name: "WEGPUNKT 6",   tag: "SIGNAL",    lat: 47.76170564732148,  lng: 8.842634771566102 },
+    { name: "MARKTWEIBER",  tag: "ZIEL",      lat: 47.76225845637471,  lng: 8.842851679977652 }
+  ];
+  const REACH_RADIUS = 10;                 // Meter, ab denen der Punkt als erreicht gilt
+  const STORAGE_KEY = "alienRadar.v1";     // reset.html leert den gesamten localStorage
+
+  /* ======================================================================
+     Hilfsfunktionen
+     ====================================================================== */
+  const $ = (id) => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
+  const rad = (d) => (d * Math.PI) / 180;
+  const deg = (r) => (r * 180) / Math.PI;
+  const angleDiff = (a, b) => ((a - b + 540) % 360) - 180;
+
+  function distanceMeters(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const dLat = rad(lat2 - lat1), dLon = rad(lon2 - lon1);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+
+  function bearingDeg(lat1, lon1, lat2, lon2) {
+    const y = Math.sin(rad(lon2 - lon1)) * Math.cos(rad(lat2));
+    const x = Math.cos(rad(lat1)) * Math.sin(rad(lat2)) - Math.sin(rad(lat1)) * Math.cos(rad(lat2)) * Math.cos(rad(lon2 - lon1));
+    return (deg(Math.atan2(y, x)) + 360) % 360;
+  }
+
+  const COMPASS = ["NORDEN", "NORDOSTEN", "OSTEN", "SÜDOSTEN", "SÜDEN", "SÜDWESTEN", "WESTEN", "NORDWESTEN"];
+  const compassWord = (d) => COMPASS[Math.round(d / 45) % 8];
+
+  function relativeWord(rel) {
+    if (rel < 22.5 || rel >= 337.5) return "GERADEAUS ⬆";
+    if (rel < 67.5)  return "SCHRÄG RECHTS ↗";
+    if (rel < 112.5) return "RECHTS ➡";
+    if (rel < 157.5) return "SCHRÄG RECHTS HINTEN ↘";
+    if (rel < 202.5) return "HINTER DIR – UMDREHEN ⬇";
+    if (rel < 247.5) return "SCHRÄG LINKS HINTEN ↙";
+    if (rel < 292.5) return "LINKS ⬅";
+    return "SCHRÄG LINKS ↖";
+  }
+
+  const formatMeters = (m) => (m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${Math.round(m)} m`);
+
+  /* ======================================================================
+     Fortschritt (localStorage)
+     ====================================================================== */
+  function loadIndex() {
+    try {
+      const s = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+      if (s && Number.isInteger(s.index)) return clamp(s.index, 0, WAYPOINTS.length);
+    } catch (e) { /* kaputter Eintrag → bei 0 beginnen */ }
+    return 0;
+  }
+  function saveIndex() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ index: idx, savedAt: Date.now() })); } catch (e) { /* privater Modus */ }
+  }
+
+  let idx = loadIndex();                 // Index des aktiven Wegpunkts
+  const finished = () => idx >= WAYPOINTS.length;
+
+  /* ======================================================================
+     Wake Lock – Display bleibt an
+     ====================================================================== */
+  let wakeLock = null, wakePending = false;
+  function setWake(state, title) {
+    const el = $("wake");
+    el.className = `wake ${state}`;
+    el.textContent = state === "on" ? "◉" : state === "bad" ? "⚠" : "○";
+    el.title = title;
+  }
+  async function requestWake() {
+    if (!("wakeLock" in navigator)) { setWake("bad", "Display-Sperre nicht unterstützt – Display-Timeout am Handy verlängern!"); return; }
+    if (wakePending || (wakeLock && !wakeLock.released)) return;
+    wakePending = true;
+    try {
+      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener("release", () => setWake("", "Display-Sperre inaktiv"));
+      setWake("on", "Display-Sperre aktiv");
+    } catch (e) {
+      setWake("", "Display-Sperre inaktiv – tippen zum Aktivieren");
+    } finally { wakePending = false; }
+  }
+  requestWake();
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") requestWake(); });
+  ["click", "touchend"].forEach((ev) =>
+    document.addEventListener(ev, () => { if (!wakeLock || wakeLock.released) requestWake(); }, { passive: true }));
+
+  /* ======================================================================
+     Kompass (Geräte-Ausrichtung)
+     ====================================================================== */
+  let heading = null;       // Blickrichtung in Grad (0 = Norden), null = unbekannt
+
+  function onOrientation(e) {
+    let hd = null;
+    if (typeof e.webkitCompassHeading === "number") hd = e.webkitCompassHeading;                         // iOS
+    else if (e.absolute && e.alpha !== null && e.alpha !== undefined) hd = (360 - e.alpha) % 360;       // Android
+    if (hd === null) return;
+    heading = heading === null ? hd : (heading + angleDiff(hd, heading) * 0.25 + 360) % 360;
+  }
+  function listenOrientation() {
+    window.addEventListener("deviceorientationabsolute", onOrientation, true);
+    window.addEventListener("deviceorientation", onOrientation, true);
+  }
+
+  if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
+    // iOS: Erlaubnis nur nach Tipp möglich
+    $("hint").hidden = false;
+    document.addEventListener("click", async () => {
+      try {
+        if ((await DeviceOrientationEvent.requestPermission()) === "granted") listenOrientation();
+      } catch (e) { /* ohne Kompass weiter */ }
+      $("hint").hidden = true;
+    }, { once: true });
+  } else {
+    listenOrientation();
+  }
+
+  /* ======================================================================
+     GPS-Tracking & Wegpunkt-Logik
+     ====================================================================== */
+  let pos = null;           // { lat, lng, acc, dist, brg }
+
+  function onPosition(p) {
+    pos = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy };
+    refresh();
+  }
+
+  function onPositionError(err) {
+    const st = $("status");
+    st.classList.add("err");
+    if (err.code === 1) st.textContent = "STANDORT BLOCKIERT – bitte Ortung für diese Seite erlauben.";
+    else if (err.code === 3) { st.classList.remove("err"); st.textContent = "SUCHE GPS-SIGNAL … bitte ins Freie gehen."; }
+    else st.textContent = "KEIN GPS-SIGNAL.";
+  }
+
+  /** Neu berechnen: Entfernung/Peilung zum aktiven Wegpunkt, ggf. weiterschalten */
+  function refresh() {
+    if (!pos || finished()) { render(); return; }
+    const wp = WAYPOINTS[idx];
+    pos.dist = distanceMeters(pos.lat, pos.lng, wp.lat, wp.lng);
+    pos.brg = bearingDeg(pos.lat, pos.lng, wp.lat, wp.lng);
+    if (pos.dist <= REACH_RADIUS) { reached(); return; }
+    $("status").classList.remove("err");
+    render();
+  }
+
+  function reached() {
+    const done = WAYPOINTS[idx];
+    idx += 1;
+    saveIndex();
+    try { if (navigator.vibrate) navigator.vibrate([120, 60, 220]); } catch (e) { /* ignorieren */ }
+    burst = 1;
+
+    if (finished()) {
+      $("end").hidden = false;
+      showToast(`✔ ${done.name} ERREICHT`);
+      render();
+    } else {
+      showToast(`✔ ${done.name} ERREICHT`);
+      refresh();              // sofort zum nächsten Wegpunkt peilen
+    }
+  }
+
+  function showToast(text) {
+    const t = $("toast");
+    t.textContent = text;
+    t.classList.remove("show");
+    void t.offsetWidth;
+    t.classList.add("show");
+  }
+
+  /* ======================================================================
+     Anzeige (Text)
+     ====================================================================== */
+  function render() {
+    // Kopfzeile + Fortschrittskästchen
+    if (finished()) {
+      $("wpName").innerHTML = "MISSION ABGESCHLOSSEN<small>ALLE WEGPUNKTE ERREICHT</small>";
+    } else {
+      const wp = WAYPOINTS[idx];
+      $("wpName").innerHTML = "";
+      $("wpName").append(`${wp.name}`);
+      const small = document.createElement("small");
+      small.textContent = `${wp.tag} · ${idx + 1} / ${WAYPOINTS.length}`;
+      $("wpName").append(small);
+    }
+    const steps = $("steps");
+    if (steps.children.length !== WAYPOINTS.length) {
+      steps.replaceChildren(...WAYPOINTS.map(() => document.createElement("i")));
+    }
+    [...steps.children].forEach((el, i) => { el.className = i < idx ? "done" : i === idx ? "now" : ""; });
+
+    // Fußzeile
+    const distEl = $("dist"), st = $("status"), info = $("info");
+    if (finished()) {
+      distEl.textContent = "0 m";
+      st.classList.remove("err");
+      st.textContent = "ZIEL ERREICHT";
+      info.textContent = "";
+      return;
+    }
+    if (!pos) { distEl.textContent = "– – –"; return; }
+
+    distEl.textContent = formatMeters(pos.dist);
+    if (!st.classList.contains("err")) {
+      st.textContent = heading === null
+        ? `PEILUNG ${compassWord(pos.brg)} · NORDEN = OBEN`
+        : `ZIEL ${relativeWord((pos.brg - heading + 360) % 360)}`;
+    }
+    info.textContent = `GPS ±${Math.round(pos.acc)} m · KOMPASS ${heading === null ? "AUS" : "AN"}`;
+  }
+  setInterval(render, 400);   // Kompass ändert sich öfter als das GPS
+
+  /* ======================================================================
+     Radar-Zeichnung
+     ====================================================================== */
+  const cv = $("radar");
+  const g = cv.getContext("2d");
+  let W = 0, H = 0, dpr = 1;
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    W = cv.clientWidth; H = cv.clientHeight;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  const RANGES = [20, 40, 80, 150, 300, 600, 1200, 2500, 5000, 10000, 25000, 100000, 1000000];
+  const pickRange = (d) => RANGES.find((r) => r >= d) || RANGES[RANGES.length - 1];
+
+  let rangeDisp = 40;           // aktuell angezeigte Reichweite (gleitet sanft)
+  let dot = { x: 0, y: 0, init: false };
+  let phase = 0, sweep = 0, burst = 0, last = 0;
+
+  function frame(t) {
+    requestAnimationFrame(frame);
+    const dt = last ? Math.min((t - last) / 1000, 0.1) : 0;
+    last = t;
+    if (!W || !H) { resize(); return; }
+
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, W, H);
+    const cx = W / 2, cy = H / 2, R = Math.max(40, Math.min(W, H) / 2 - 14);
+
+    // Reichweite gleitend anpassen
+    const targetRange = pos && !finished() ? pickRange(pos.dist * 1.15) : 40;
+    rangeDisp *= Math.exp(Math.log(targetRange / rangeDisp) * (1 - Math.exp(-dt * 3)));
+
+    // Scheibe & Ringe
+    g.fillStyle = "rgba(0, 28, 14, 0.55)";
+    g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.fill();
+    g.lineWidth = 1.5; g.strokeStyle = "rgba(0, 255, 102, 0.35)";
+    g.font = "11px 'Courier New', monospace"; g.textAlign = "left"; g.textBaseline = "bottom";
+    for (let i = 1; i <= 4; i++) {
+      const r = (R * i) / 4;
+      g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke();
+      g.fillStyle = "rgba(0, 255, 102, 0.55)";
+      g.fillText(formatMeters((rangeDisp * i) / 4), cx + r * 0.7071 + 3, cy - r * 0.7071 - 2);
+    }
+    g.beginPath();
+    g.moveTo(cx - R, cy); g.lineTo(cx + R, cy); g.moveTo(cx, cy - R); g.lineTo(cx, cy + R);
+    g.stroke();
+
+    // Nordmarke
+    const north = heading === null ? 0 : -heading;
+    g.fillStyle = "#00f0ff"; g.font = "bold 18px 'Courier New', monospace"; g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText("N", cx + (R + 0) * Math.sin(rad(north)) * 0.93, cy - R * Math.cos(rad(north)) * 0.93);
+
+    // Radar-Sweep
+    sweep = (sweep + dt * 1.3) % (Math.PI * 2);
+    g.lineWidth = 5;
+    for (let i = 0; i < 30; i++) {
+      const a = sweep - i * 0.035;
+      g.strokeStyle = `rgba(0, 255, 102, ${0.3 * (1 - i / 30)})`;
+      g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + R * Math.sin(a), cy - R * Math.cos(a)); g.stroke();
+    }
+
+    if (finished()) {
+      // Sieg: grüne Ringe vom Zentrum
+      phase = (phase + dt * 0.6) % 1;
+      for (let k = 0; k < 3; k++) {
+        const p = (phase + k / 3) % 1;
+        g.strokeStyle = `rgba(0, 255, 102, ${1 - p})`; g.lineWidth = 3;
+        g.beginPath(); g.arc(cx, cy, p * R, 0, Math.PI * 2); g.stroke();
+      }
+    } else if (pos) {
+      const frac = pos.dist / rangeDisp;
+      const rel = rad((pos.brg - (heading ?? 0) + 360) % 360);
+      const r = Math.min(frac, 1) * R * 0.97;
+      const tx = cx + r * Math.sin(rel), ty = cy - r * Math.cos(rel);
+
+      // Punkt gleitet sanft (statt zu springen)
+      if (!dot.init) { dot.x = tx; dot.y = ty; dot.init = true; }
+      const k = 1 - Math.exp(-dt * 7);
+      dot.x += (tx - dot.x) * k; dot.y += (ty - dot.y) * k;
+
+      // Verbindungslinie (gestrichelt, "wandert" zum Ziel)
+      g.setLineDash([5, 10]); g.lineDashOffset = -t / 40;
+      g.strokeStyle = "rgba(0, 240, 255, 0.75)"; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(cx, cy); g.lineTo(dot.x, dot.y); g.stroke();
+      g.setLineDash([]);
+
+      // Fangradius (10 m) um das Ziel
+      const capture = Math.max(7, (REACH_RADIUS / rangeDisp) * R);
+      g.strokeStyle = "rgba(0, 255, 102, 0.8)"; g.lineWidth = 1.5;
+      g.setLineDash([3, 4]);
+      g.beginPath(); g.arc(dot.x, dot.y, capture, 0, Math.PI * 2); g.stroke();
+      g.setLineDash([]);
+
+      // Puls: je näher, desto schneller
+      const period = 0.35 + 2.2 * clamp(pos.dist / 120, 0, 1);
+      phase = (phase + dt / period) % 1;
+      g.strokeStyle = `rgba(0, 240, 255, ${1 - phase})`; g.lineWidth = 3;
+      g.beginPath(); g.arc(dot.x, dot.y, 8 + phase * 36, 0, Math.PI * 2); g.stroke();
+
+      g.fillStyle = "#00f0ff"; g.shadowColor = "#00f0ff"; g.shadowBlur = 16;
+      g.beginPath(); g.arc(dot.x, dot.y, 7 + (1 - phase) * 3, 0, Math.PI * 2); g.fill();
+      g.shadowBlur = 0;
+    } else {
+      g.fillStyle = "rgba(0, 255, 102, 0.8)"; g.font = "bold 14px 'Courier New', monospace"; g.textAlign = "center";
+      g.fillText("SUCHE SIGNAL …", cx, cy + R * 0.45);
+    }
+
+    // Blitz beim Erreichen eines Wegpunkts
+    if (burst > 0) {
+      g.strokeStyle = `rgba(0, 255, 102, ${burst})`; g.lineWidth = 4;
+      g.beginPath(); g.arc(cx, cy, (1 - burst) * R, 0, Math.PI * 2); g.stroke();
+      burst = Math.max(0, burst - dt * 1.2);
+    }
+
+    // Eigener Standort (zeigt nach oben = Blickrichtung)
+    g.fillStyle = "#00ff66"; g.shadowColor = "#00ff66"; g.shadowBlur = 12;
+    g.beginPath(); g.moveTo(cx, cy - 14); g.lineTo(cx + 9, cy + 10); g.lineTo(cx - 9, cy + 10); g.closePath(); g.fill();
+    g.shadowBlur = 0;
+  }
+  requestAnimationFrame(frame);
+
+  /* ======================================================================
+     Start
+     ====================================================================== */
+  render();
+  if (finished()) $("end").hidden = false;
+
+  if (!navigator.geolocation) {
+    $("status").classList.add("err");
+    $("status").textContent = "DIESES GERÄT UNTERSTÜTZT KEINE ORTUNG.";
+  } else {
+    navigator.geolocation.watchPosition(onPosition, onPositionError, {
+      enableHighAccuracy: true, maximumAge: 1000, timeout: 20000
+    });
+  }
+
+  // Test-Hilfe: index.html?debug zeigt einen Button zum Überspringen
+  if (new URLSearchParams(location.search).has("debug")) {
+    $("dbg").hidden = false;
+    $("dbg").addEventListener("click", () => { if (!finished()) reached(); });
+  }
+  </script>
 </body>
 </html>

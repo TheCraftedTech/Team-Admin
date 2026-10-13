@@ -2,44 +2,23 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <title>Reset – Alien-Rallye</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0a0a12">
+  <title>Reset</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#030307">
   <meta name="robots" content="noindex">
-  <link rel="stylesheet" href="style.css">
+  <style>
+    html, body { height: 100%; margin: 0; background: #030307; color: #00ff66; font-family: "Courier New", monospace; }
+    body { display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; }
+    a { color: #00f0ff; }
+  </style>
+  <script>
+    // Sofort beim Aufruf: gesamten localStorage leeren und zurück zum Start
+    try { localStorage.clear(); } catch (e) { /* privater Modus */ }
+    try { sessionStorage.clear(); } catch (e) { /* ignorieren */ }
+    location.replace("index.html");
+  </script>
 </head>
 <body>
-  <div class="radar" aria-hidden="true"></div>
-  <div class="scanlines" aria-hidden="true"></div>
-
-  <main style="margin-top:20vh">
-    <article class="card success">
-      <div class="tag-row"><span class="tag">Debug</span></div>
-      <h2 id="title">Setze zurück …</h2>
-      <p class="story" id="msg">Spielstand wird gelöscht.</p>
-      <a class="btn cyan" href="index.html" style="text-align:center;text-decoration:none">Zur Rallye</a>
-    </article>
-  </main>
-
-  <script>
-    (async () => {
-      let cleared = true;
-      try { localStorage.clear(); sessionStorage.clear(); } catch (e) { cleared = false; }
-
-      // Falls später ein Service Worker aktiv ist: Caches & Registrierungen entfernen
-      try {
-        if ("caches" in window) for (const k of await caches.keys()) await caches.delete(k);
-        if (navigator.serviceWorker) {
-          for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
-        }
-      } catch (e) { /* ignorieren */ }
-
-      document.getElementById("title").textContent = cleared ? "Alles zurückgesetzt" : "Löschen fehlgeschlagen";
-      document.getElementById("msg").textContent = cleared
-        ? "Spielstand gelöscht. Du wirst gleich zum Start weitergeleitet …"
-        : "Der Browser-Speicher ist nicht zugänglich (privater Modus?).";
-      if (cleared) setTimeout(() => location.replace("index.html"), 1800);
-    })();
-  </script>
+  <p>SPIELSTAND GELÖSCHT.<br><a href="index.html">Weiter zur Rallye</a></p>
 </body>
 </html>
