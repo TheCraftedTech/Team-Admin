@@ -4,6 +4,7 @@
    info      Seite zum Durchlesen (Inhalt aus einer Markdown-Datei)
    locate    Ortungs-Radar zu einem Ort, „WEITER“ erst am Ort
    password  Eingabefeld für ein Passwort (Text darüber aus Markdown)
+   memory    Minispiel: Muster aus leuchtenden Tasten merken und nachtippen
    end       Abschlussseite (Inhalt aus einer Markdown-Datei)
    Inhalte und Reihenfolge stehen in steps.js, die Steuerung in core.js.
    Jedes Modul hat genau einen Haupt-Button mit der Klasse „go“ (die Debug-Seite findet ihn damit).
@@ -291,5 +292,151 @@ registerModule("locate", (ctx) => {
       window.removeEventListener("resize", resize);
     },
     info: () => ({ type: "locate", dist, arrived, radius, maxAcc, fixes: fixesNeeded, inside })
+  };
+});
+
+/* ======================================================================
+   Modul „memory“ – Minispiel „Störsender“: Muster merken und nachtippen
+   Auf einem Raster (size × size) leuchten dots Tasten mehrmals auf. Danach tippt man genau diese
+   Tasten an (Reihenfolge egal). Bei einem Fehler kommt dieselbe Runde mit neuem Muster.
+   Nach rounds geschafften Runden geht es weiter.
+   ====================================================================== */
+registerModule("memory", (ctx) => {
+  const S = ctx.step;
+  const size = S.size ?? 5;
+  const dots = S.dots ?? 5;
+  const rounds = S.rounds ?? 3;
+  const blinks = S.blinks ?? 2;
+  const onMs = S.onMs ?? 500;
+  const offMs = S.offMs ?? 280;
+  const total = size * size;
+
+  let solved = clamp(Number(ctx.data.solved) || 0, 0, rounds - 1);   // geschaffte Runden (bleibt nach Neuladen)
+  let phase = "idle";                                                // idle | show | input | fail | done
+  let pattern = new Set();
+  let found = new Set();
+
+  /* ----- Zeitgeber, die beim Verlassen des Schritts aufgeräumt werden ----- */
+  const timers = new Set();
+  function later(fn, ms) {
+    const id = setTimeout(() => { timers.delete(id); fn(); }, ms);
+    timers.add(id);
+  }
+
+  /* ----- Oberfläche ----- */
+  const parts = [];
+  if (S.md) {
+    const content = h("div", "md");
+    parts.push(content);
+    fillMarkdown(content, S.md);
+  }
+
+  const title = h("div", "mem-title");
+  const leds = h("div", "dots");
+  const status = h("div", "feedback");
+  status.setAttribute("role", "status");
+  const cells = Array.from({ length: total }, (_, i) => {
+    const b = h("button", "mem-cell");
+    b.type = "button";
+    b.disabled = true;
+    b.setAttribute("aria-label", `Taste ${i + 1}`);
+    b.addEventListener("click", () => tap(i));
+    return b;
+  });
+  const grid = h("div", "mem-grid", "", cells);
+  grid.style.setProperty("--n", size);
+  const startBtn = h("button", "go", S.button || "STARTEN");
+  startBtn.type = "button";
+  startBtn.addEventListener("click", () => startRound());
+
+  parts.push(h("div", "mem-box", "", [title, leds, grid, status]), startBtn);
+  ctx.root.append(h("div", "scroller", "", [h("div", "page", "", parts)]));
+
+  function setStatus(text, kind) {
+    status.textContent = text;
+    status.className = "feedback" + (kind ? " " + kind : "");
+  }
+  function renderRounds() {
+    setText(title, `RUNDE ${Math.min(solved + 1, rounds)} / ${rounds}`);
+    if (leds.children.length !== rounds) leds.replaceChildren(...Array.from({ length: rounds }, () => document.createElement("i")));
+    [...leds.children].forEach((d, i) => { d.className = i < solved ? "done" : i === solved ? "now" : ""; });
+  }
+  function resetCells() {
+    cells.forEach((c) => { c.className = "mem-cell"; c.disabled = true; });
+  }
+  function shuffled(n) {
+    const a = Array.from({ length: n }, (_, i) => i);
+    for (let i = n - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  }
+
+  /* ----- Ablauf einer Runde ----- */
+  function startRound() {
+    timers.forEach(clearTimeout);
+    timers.clear();
+    phase = "show";
+    startBtn.hidden = true;
+    found = new Set();
+    pattern = new Set(shuffled(total).slice(0, dots));
+    resetCells();
+    renderRounds();
+    setStatus("MUSTER EINPRÄGEN …");
+
+    let t = 400;
+    for (let b = 0; b < blinks; b++) {
+      later(() => pattern.forEach((i) => cells[i].classList.add("lit")), t);
+      t += onMs;
+      later(() => pattern.forEach((i) => cells[i].classList.remove("lit")), t);
+      t += offMs;
+    }
+    later(() => {
+      phase = "input";
+      cells.forEach((c) => { c.disabled = false; });
+      setStatus(`MUSTER EINGEBEN (0 / ${dots})`);
+    }, t);
+  }
+
+  function tap(i) {
+    if (phase !== "input" || found.has(i)) return;
+
+    if (pattern.has(i)) {
+      found.add(i);
+      cells[i].classList.add("ok");
+      cells[i].disabled = true;
+      if (found.size < dots) { setStatus(`MUSTER EINGEBEN (${found.size} / ${dots})`); return; }
+
+      solved += 1;
+      ctx.data.solved = solved;
+      ctx.save();
+      cells.forEach((c) => { c.disabled = true; });
+      if (solved >= rounds) {
+        phase = "done";
+        renderRounds();
+        setStatus("STÖRSENDER DEAKTIVIERT ✔", "ok");
+        vibrateOnce();
+        later(() => ctx.next(), 1100);
+      } else {
+        phase = "show";
+        setStatus(`RUNDE ${solved} GESCHAFFT ✔`, "ok");
+        later(startRound, 1300);
+      }
+      return;
+    }
+
+    // Falsche Taste: die übersehenen Tasten kurz zeigen, dann dieselbe Runde mit neuem Muster
+    phase = "fail";
+    cells[i].classList.add("bad");
+    pattern.forEach((p) => { if (!found.has(p)) cells[p].classList.add("miss"); });
+    cells.forEach((c) => { c.disabled = true; });
+    setStatus("FALSCH – NEUES MUSTER KOMMT …", "err");
+    later(startRound, 1700);
+  }
+
+  renderRounds();
+  setStatus("BEREIT");
+
+  return {
+    destroy() { timers.forEach(clearTimeout); timers.clear(); },
+    info: () => ({ type: "memory", phase, solved, rounds, pattern: [...pattern], found: [...found] })
   };
 });
