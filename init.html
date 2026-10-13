@@ -38,15 +38,13 @@
     li button { min-width: 128px; }
 
     .actions { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
-    .actions .btn.primary { background: rgba(0, 255, 102, 0.14); font-weight: bold; padding: 14px; }
-    .actions .btn.disabled { opacity: 0.35; pointer-events: none; }
     .secure { margin-top: 16px; font-size: 12px; color: var(--muted); }
     .secure.bad { color: var(--red); }
   </style>
 </head>
 <body>
   <h1>BERECHTIGUNGEN</h1>
-  <p class="sub">Das Radar braucht Zugriff auf die folgenden Dinge. Wird beim Öffnen automatisch abgefragt – mit „Neu fragen“ kannst du jede Abfrage wiederholen.</p>
+  <p class="sub">Das Radar braucht Zugriff auf die folgenden Dinge. Wird beim Öffnen automatisch abgefragt – mit „Neu fragen“ kannst du jede Abfrage wiederholen. Danach diese Seite schließen und das Spiel (index.html) öffnen.</p>
 
   <ul>
     <li id="r-geo" data-state="wait">
@@ -73,7 +71,6 @@
 
   <div class="actions">
     <button type="button" id="all">Alles neu initialisieren</button>
-    <a class="btn primary disabled" id="go" href="index.html" aria-disabled="true">Weiter zum Radar</a>
   </div>
 
   <p class="secure" id="secure"></p>
@@ -96,17 +93,6 @@
     row.querySelector(".detail").textContent = detail || "";
   }
 
-  /* ---------- Weiter-Button: erst aktiv, wenn der Standort funktioniert ---------- */
-  let geoOk = false;
-  function setGeoOk(ok) {
-    geoOk = ok;
-    const go = $("go");
-    go.classList.toggle("disabled", !ok);
-    go.setAttribute("aria-disabled", String(!ok));
-    if (ok) { try { sessionStorage.setItem("radar.initDone", "1"); } catch (e) { /* ignorieren */ } }
-  }
-  $("go").addEventListener("click", (e) => { if (!geoOk) e.preventDefault(); });
-
   /* ---------- Standort ---------- */
   let geoBusy = false;
 
@@ -122,8 +108,8 @@
     if (geoBusy) return;
     geoBusy = true;
     try {
-      if (!navigator.geolocation) { setRow("geo", "err", "NICHT VERFÜGBAR", "Dieses Gerät/dieser Browser unterstützt keine Ortung."); setGeoOk(false); return; }
-      if (!window.isSecureContext) { setRow("geo", "err", "NICHT AKTIV", "Ortung funktioniert nur über eine sichere Verbindung (https://)."); setGeoOk(false); return; }
+      if (!navigator.geolocation) { setRow("geo", "err", "NICHT VERFÜGBAR", "Dieses Gerät/dieser Browser unterstützt keine Ortung."); return; }
+      if (!window.isSecureContext) { setRow("geo", "err", "NICHT AKTIV", "Ortung funktioniert nur über eine sichere Verbindung (https://)."); return; }
 
       setRow("geo", "wait", "FRAGT …", "Bitte die Anfrage des Browsers mit „Erlauben“ bestätigen.");
       const result = await new Promise((resolve) => {
@@ -136,17 +122,17 @@
 
       if (result.ok) {
         setRow("geo", "ok", "AKTIV", `Position empfangen (Genauigkeit ±${Math.round(result.p.coords.accuracy)} m).`);
-        setGeoOk(true);
+       
       } else if (result.err.code === 1) {
         setRow("geo", "err", "BLOCKIERT", GEO_BLOCKED_HELP);
-        setGeoOk(false);
+       
       } else {
         // Erlaubt, aber noch kein GPS-Fix (Timeout) oder Ortungsdienste des Handys sind aus
         const state = await geoPermissionState();
         const granted = state === "granted" || state === "unknown";
         setRow("geo", granted ? "warn" : "err", granted ? "ERLAUBT, KEIN SIGNAL" : "NICHT AKTIV",
           "Noch keine Position. Ins Freie gehen und prüfen, ob die Ortungsdienste des Handys eingeschaltet sind.");
-        setGeoOk(granted);
+       
       }
     } finally {
       geoBusy = false;
@@ -287,12 +273,12 @@
 
     // Standort-Status sofort anzeigen und bei Änderung (z. B. in den Einstellungen erlaubt) nachziehen
     const state = await geoPermissionState();
-    if (state === "denied") { setRow("geo", "err", "BLOCKIERT", GEO_BLOCKED_HELP); setGeoOk(false); }
+    if (state === "denied") { setRow("geo", "err", "BLOCKIERT", GEO_BLOCKED_HELP); }
     else askGeo();
 
     try {
       const status = await navigator.permissions.query({ name: "geolocation" });
-      status.addEventListener("change", () => { if (status.state === "denied") { setRow("geo", "err", "BLOCKIERT", GEO_BLOCKED_HELP); setGeoOk(false); } else askGeo(); });
+      status.addEventListener("change", () => { if (status.state === "denied") { setRow("geo", "err", "BLOCKIERT", GEO_BLOCKED_HELP); } else askGeo(); });
     } catch (e) { /* nicht unterstützt */ }
 
     askSensors();
