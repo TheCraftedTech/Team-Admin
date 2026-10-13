@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Debug</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#030307">
+  <meta name="robots" content="noindex">
+
+  <style>
+    :root { --bg: #030307; --green: #00ff66; --cyan: #00f0ff; --red: #ff3b5c; --amber: #ffb020; --muted: #7c9a8d; --line: #1b2a24; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: var(--bg); color: #d6efe3; font-family: "Courier New", ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+
+    .wrap { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; align-items: flex-start; padding: 12px; }
+    .phone { width: 390px; max-width: 100%; height: min(800px, 82vh); border: 2px solid var(--green); border-radius: 18px; overflow: hidden; background: #000; box-shadow: 0 0 24px rgba(0, 255, 102, 0.25); }
+    iframe { width: 100%; height: 100%; border: 0; display: block; }
+
+    .panel { flex: 1 1 340px; max-width: 520px; display: flex; flex-direction: column; gap: 12px; }
+    h1 { font-size: 16px; color: var(--green); letter-spacing: 2px; }
+    h2 { font-size: 12px; color: var(--cyan); letter-spacing: 1px; margin-bottom: 8px; text-transform: uppercase; }
+    section { border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+    section.warn { border-color: #6a4a10; }
+    section.warn h2 { color: var(--amber); }
+
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .row + .row { margin-top: 8px; }
+    button { font: inherit; color: var(--green); background: transparent; border: 1px solid var(--green); border-radius: 6px; padding: 8px 10px; cursor: pointer; }
+    button:active { background: rgba(0, 255, 102, 0.15); }
+    button.danger { color: var(--amber); border-color: var(--amber); }
+    label { display: inline-flex; align-items: center; gap: 6px; color: #d6efe3; }
+    input[type="number"], select { font: inherit; width: 72px; background: #0a0f0d; color: var(--green); border: 1px solid var(--line); border-radius: 4px; padding: 5px; }
+    select { width: auto; }
+    input[type="range"] { flex: 1; min-width: 120px; accent-color: var(--green); }
+
+    pre { white-space: pre-wrap; line-height: 1.55; color: #d6efe3; }
+    #log { max-height: 160px; overflow-y: auto; color: var(--muted); font-size: 12px; }
+    .err { color: var(--red); }
+    .hint { color: var(--muted); font-size: 12px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="phone">
+      <iframe id="game" src="index.html" title="Spiel" allow="geolocation; accelerometer; gyroscope; magnetometer; screen-wake-lock"></iframe>
+    </div>
+
+    <aside class="panel">
+      <h1>DEBUG – index.html im Iframe</h1>
+      <p class="hint" id="problem" hidden></p>
+
+      <section>
+        <h2>Status</h2>
+        <pre id="status">Lade …</pre>
+      </section>
+
+      <section>
+        <h2>Spielablauf (mit den normalen Regeln)</h2>
+        <div class="row">
+          <button type="button" id="intro">Info-Seite: „FERTIG“</button>
+          <button type="button" id="next">„WEITER“ drücken</button>
+        </div>
+        <p class="hint" style="margin-top:8px">„WEITER“ klappt wie im Spiel nur, wenn der Button sichtbar ist, also erst am Ort.</p>
+      </section>
+
+      <section>
+        <h2>Fake-GPS (überschreibt das echte GPS)</h2>
+        <div class="row">
+          <button type="button" id="tp">Zum Ort teleportieren</button>
+          <button type="button" id="far">100 m davor</button>
+          <button type="button" id="step">Schritt zum Ort</button>
+        </div>
+        <div class="row">
+          <label>Schritt <input type="number" id="stepM" value="12" min="1" max="200"> m</label>
+          <label>Genauigkeit <input type="number" id="acc" value="8" min="1" max="500"> m</label>
+        </div>
+        <div class="row">
+          <label><input type="checkbox" id="auto"> Auto-Walk</label>
+          <label><input type="checkbox" id="autoNext"> Auto-WEITER</label>
+          <button type="button" id="real">Echtes GPS</button>
+        </div>
+        <p class="hint" style="margin-top:8px">Auto-Walk läuft zum aktuellen Ort, die Ankunft prüft das Spiel selbst (Radius/Genauigkeit). Mit Auto-WEITER läuft es bis zum Ziel durch.</p>
+      </section>
+
+      <section>
+        <h2>Fake-Kompass</h2>
+        <div class="row">
+          <label><input type="checkbox" id="compass"> an</label>
+          <input type="range" id="heading" min="0" max="359" value="0">
+          <span id="headingVal">0°</span>
+        </div>
+      </section>
+
+      <section class="warn">
+        <h2>Springen – umgeht die Spielregeln (nur Debug)</h2>
+        <div class="row">
+          <button type="button" id="prev" class="danger">‹ Ort zurück</button>
+          <button type="button" id="skip" class="danger">Ort überspringen ›</button>
+        </div>
+        <div class="row">
+          <label>Gehe zu <select id="jump"></select></label>
+          <button type="button" id="jumpGo" class="danger">Springen</button>
+          <button type="button" id="reset" class="danger">Alles zurücksetzen</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Protokoll</h2>
+        <pre id="log"></pre>
+      </section>
+    </aside>
+  </div>
+
+  <script>
+  "use strict";
+
+  /* ======================================================================
+     debug.html – zeigt die index.html in einem Iframe (kein doppelter Code) und steuert sie
+     von außen. Das geht, weil beide Seiten denselben Ursprung haben (über https:// oder
+     http://localhost öffnen – als Datei (file://) verbietet der Browser den Zugriff).
+     Die Spiellogik bleibt in index.html; hier werden nur deren Funktionen aufgerufen.
+     ====================================================================== */
+
+  const $ = (id) => document.getElementById(id);
+  const frame = $("game");
+  const M_PER_DEG = 111320;
+
+  /* ---------- Zugriff auf das Spiel ---------- */
+  function gameWindow() {
+    try {
+      const w = frame.contentWindow;
+      void w.document;                      // wirft bei fremdem Ursprung
+      return typeof w.onPosition === "function" ? w : null;
+    } catch (e) { return null; }
+  }
+  /** Code im Kontext des Spiels ausführen (kommt auch an dessen let/const heran) */
+  function ev(code) {
+    const w = gameWindow();
+    if (!w) throw new Error("Spiel nicht bereit");
+    return w.eval(code);
+  }
+
+  function log(msg, isError) {
+    const el = $("log");
+    const line = document.createElement("div");
+    line.textContent = `${new Date().toLocaleTimeString()}  ${msg}`;
+    if (isError) line.className = "err";
+    el.prepend(line);
+    while (el.childElementCount > 60) el.lastChild.remove();
+  }
+
+  /** Führt eine Aktion aus und meldet Fehler im Protokoll */
+  function act(name, fn) {
+    try { fn(); } catch (e) { log(`${name}: ${e.message}`, true); }
+  }
+
+  /* ---------- Geometrie ---------- */
+  const mToLat = (m) => m / M_PER_DEG;
+  const mToLng = (m, lat) => m / (M_PER_DEG * Math.cos((lat * Math.PI) / 180));
+  function distM(a, b) {
+    const dy = (b.lat - a.lat) * M_PER_DEG;
+    const dx = (b.lng - a.lng) * M_PER_DEG * Math.cos((a.lat * Math.PI) / 180);
+    return Math.hypot(dx, dy);
+  }
+
+  function snapshot() {
+    return ev("({ intro: state.introDone, index: state.index, arrived: state.arrived, finished: finished(), total: WAYPOINTS.length, " +
+              "target: finished() ? null : { lat: WAYPOINTS[state.index].lat, lng: WAYPOINTS[state.index].lng }, " +
+              "pos: pos ? { acc: pos.acc, dist: pos.dist === undefined ? null : pos.dist, age: (Date.now() - pos.t) / 1000 } : null, " +
+              "heading: heading, radius: REACH_RADIUS, maxAcc: MAX_ACCURACY })");
+  }
+
+  /* ---------- Fake-GPS ---------- */
+  const fake = { active: false, lat: 0, lng: 0 };
+
+  function sendFix() {
+    const w = gameWindow();
+    if (!w || !fake.active) return;
+    w.onPosition({ coords: { latitude: fake.lat, longitude: fake.lng, accuracy: Number($("acc").value) || 8, heading: null, speed: 0 } });
+  }
+  function setFake(lat, lng) {
+    fake.active = true; fake.lat = lat; fake.lng = lng;
+    sendFix(); sendFix();                    // zwei Messungen: so viele braucht das Spiel für die Ankunft
+  }
+
+  // Frische Fake-Messung, solange aktiv (sonst würde ein echtes GPS-Signal dazwischenfunken)
+  setInterval(() => { try { sendFix(); } catch (e) { /* Spiel lädt gerade */ } }, 1000);
+
+  function stepToward(t, meters) {
+    const d = distM(fake, t);
+    if (d < 0.5) return;
+    const k = Math.min(meters, d) / d;
+    setFake(fake.lat + (t.lat - fake.lat) * k, fake.lng + (t.lng - fake.lng) * k);
+  }
+
+  $("tp").addEventListener("click", () => act("Teleport", () => {
+    const s = snapshot();
+    if (!s.target) throw new Error("Schon am Ende");
+    setFake(s.target.lat, s.target.lng);
+    log(`Fake-GPS direkt am Ort ${s.index + 1}.`);
+  }));
+  $("far").addEventListener("click", () => act("100 m davor", () => {
+    const s = snapshot();
+    if (!s.target) throw new Error("Schon am Ende");
+    setFake(s.target.lat - mToLat(100), s.target.lng);
+    log(`Fake-GPS 100 m südlich von Ort ${s.index + 1}.`);
+  }));
+  $("step").addEventListener("click", () => act("Schritt", () => {
+    const s = snapshot();
+    if (!s.target) throw new Error("Schon am Ende");
+    if (!fake.active) setFake(s.target.lat - mToLat(100), s.target.lng);
+    stepToward(s.target, Number($("stepM").value) || 12);
+  }));
+  $("real").addEventListener("click", () => { fake.active = false; $("auto").checked = false; log("Echtes GPS wird wieder genutzt."); });
+
+  /* ---------- Spielablauf ---------- */
+  function pressIntro() {
+    const b = gameWindow().document.querySelector("#intro button");
+    if (!b || gameWindow().document.getElementById("intro").hidden) throw new Error("Die Info-Seite ist schon geschlossen");
+    b.click();
+    log("Info-Seite mit „FERTIG“ geschlossen.");
+  }
+  function pressNext() {
+    const b = gameWindow().document.getElementById("next");
+    if (b.hidden) throw new Error("„WEITER“ ist noch nicht sichtbar – erst am Ort (innerhalb des Radius).");
+    b.click();
+    log("„WEITER“ gedrückt.");
+  }
+  $("intro").addEventListener("click", () => act("Info", pressIntro));
+  $("next").addEventListener("click", () => act("WEITER", pressNext));
+
+  /* ---------- Auto-Walk ---------- */
+  setInterval(() => {
+    if (!$("auto").checked) return;
+    try {
+      const s = snapshot();
+      if (!s.intro) { pressIntro(); return; }
+      if (s.finished) { $("auto").checked = false; log("Ziel erreicht – Auto-Walk beendet."); return; }
+      if (s.arrived) { if ($("autoNext").checked) { pressNext(); } return; }
+      if (!fake.active) setFake(s.target.lat - mToLat(150), s.target.lng);
+      stepToward(s.target, Number($("stepM").value) || 12);
+    } catch (e) { /* Spiel lädt gerade */ }
+  }, 400);
+
+  /* ---------- Fake-Kompass ---------- */
+  $("heading").addEventListener("input", () => { $("headingVal").textContent = `${$("heading").value}°`; });
+  setInterval(() => {
+    if (!$("compass").checked) return;
+    try { ev(`setSensorHeading(${Number($("heading").value)})`); } catch (e) { /* Spiel lädt gerade */ }
+  }, 100);
+
+  /* ---------- Springen (Debug-Notausgang, umgeht die Regeln) ---------- */
+  function jumpTo(index) {
+    ev(`state.introDone = true; state.index = ${index}; state.arrived = false; insideCount = 0; saveState(); syncUI(); refresh();`);
+    log(index >= Number(ev("WAYPOINTS.length")) ? "Zum Ende gesprungen." : `Zu Ort ${index + 1} gesprungen.`);
+  }
+  $("skip").addEventListener("click", () => act("Überspringen", () => {
+    const s = snapshot();
+    if (s.finished) throw new Error("Schon am Ende");
+    ev("state.introDone = true; state.arrived = true; advance();");
+    log(`Ort ${s.index + 1} übersprungen (Debug).`);
+  }));
+  $("prev").addEventListener("click", () => act("Zurück", () => {
+    const s = snapshot();
+    jumpTo(Math.max(0, s.index - 1));
+  }));
+  $("jumpGo").addEventListener("click", () => act("Springen", () => jumpTo(Number($("jump").value))));
+  $("reset").addEventListener("click", () => act("Reset", () => {
+    fake.active = false;
+    $("auto").checked = false;
+    ev("localStorage.clear()");
+    frame.contentWindow.location.reload();
+    log("Spielstand gelöscht, Spiel neu geladen.");
+  }));
+
+  /* ---------- Statusanzeige ---------- */
+  function renderStatus() {
+    const box = $("status"), problem = $("problem");
+    let s;
+    try { s = snapshot(); } catch (e) {
+      const blocked = !gameWindow() && frame.contentDocument === null;
+      box.textContent = "Spiel nicht erreichbar.";
+      problem.hidden = false;
+      problem.className = "hint err";
+      problem.textContent = blocked || location.protocol === "file:"
+        ? "Zugriff blockiert: Bitte debug.html über https:// (z. B. GitHub Pages) oder http://localhost öffnen, nicht als Datei."
+        : "Das Spiel lädt noch …";
+      return;
+    }
+    problem.hidden = true;
+
+    if (!$("jump").options.length) {
+      for (let i = 0; i < s.total; i++) $("jump").add(new Option(`Ort ${i + 1}`, i));
+      $("jump").add(new Option("Ende (Ziel)", s.total));
+    }
+
+    const lines = [];
+    lines.push(`Info-Seite: ${s.intro ? "gelesen" : "noch offen"}`);
+    lines.push(s.finished ? "Ort: ALLE erreicht (Ende)" : `Ort: ${s.index + 1} / ${s.total}   Angekommen: ${s.arrived ? "JA (WEITER sichtbar)" : "nein"}`);
+    lines.push(s.pos
+      ? `Entfernung: ${s.pos.dist === null ? "–" : Math.round(s.pos.dist) + " m"}   GPS ±${Math.round(s.pos.acc)} m   (${fake.active ? "FAKE" : "echt"}, vor ${Math.round(s.pos.age)} s)`
+      : "Position: noch keine");
+    lines.push(`Regel: Radius ${s.radius} m, Genauigkeit ≤ ${s.maxAcc} m, 2 Messungen in Folge`);
+    lines.push(`Kompass: ${s.heading === null ? "–" : Math.round(s.heading) + "°"}`);
+    box.textContent = lines.join("\n");
+  }
+  setInterval(renderStatus, 500);
+
+  frame.addEventListener("load", () => log("Spiel geladen."));
+  </script>
+</body>
+</html>

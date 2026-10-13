@@ -177,7 +177,7 @@
       hasFix = true;
       clearInterval(fixTimer);
       if (acc <= 20) setRow("fix", "ok", "AKTIV", `Position empfangen – Genauigkeit ±${acc} m (live).`);
-      else setRow("fix", "warn", "UNGENAU", `Position empfangen, aber nur ±${acc} m genau. Für die Ankunft werden ±30 m benötigt – ins Freie gehen und warten.`);
+      else setRow("fix", "warn", "UNGENAU", `Position empfangen, aber nur ±${acc} m genau. Für die Ankunft werden ±50 m benötigt – ins Freie gehen und warten.`);
       showPermission("granted");
     };
 
