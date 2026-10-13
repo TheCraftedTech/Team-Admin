@@ -20,7 +20,7 @@
     li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
     .info { flex: 1 1 100%; }
     .info b { display: block; font-size: 15px; }
-    .detail { display: block; margin-top: 3px; font-size: 12px; line-height: 1.45; color: var(--muted); }
+    .detail { display: block; margin-top: 3px; font-size: 12px; line-height: 1.45; color: var(--muted); white-space: pre-line; }
     .status { flex: 1; font-weight: bold; font-size: 14px; letter-spacing: 1px; }
     li[data-state="ok"]   .status { color: var(--green); }
     li[data-state="err"]  .status { color: var(--red); }
@@ -28,18 +28,16 @@
     li[data-state="wait"] .status { color: var(--cyan); }
     li[data-state="err"] { border-color: #5a2431; }
 
-    button, .btn {
+    button {
       font: inherit; font-size: 14px; color: var(--green); background: transparent;
       border: 1px solid var(--green); border-radius: 6px; padding: 10px 14px; cursor: pointer;
-      text-decoration: none; text-align: center;
     }
-    button:active, .btn:active { background: rgba(0, 255, 102, 0.15); }
-    button:disabled { opacity: 0.45; }
+    button:active { background: rgba(0, 255, 102, 0.15); }
     li button { min-width: 128px; }
 
     .actions { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
-    .secure { margin-top: 16px; font-size: 12px; color: var(--muted); }
-    .secure.bad { color: var(--red); }
+    .diag { margin-top: 16px; font-size: 12px; line-height: 1.6; color: var(--muted); }
+    .diag.bad { color: var(--red); }
   </style>
 </head>
 <body>
@@ -78,7 +76,7 @@
     <button type="button" id="all">Alles neu initialisieren</button>
   </div>
 
-  <p class="secure" id="secure"></p>
+  <p class="diag" id="diag"></p>
 
   <script>
   "use strict";
@@ -90,6 +88,7 @@
      ====================================================================== */
 
   const $ = (id) => document.getElementById(id);
+  const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
   function setRow(key, state, text, detail) {
     const row = $("r-" + key);
@@ -101,16 +100,23 @@
   /* ---------- Standort: Berechtigung und Signal sind zwei verschiedene Dinge ----------
      1) Berechtigung: darf die Seite den Standort nutzen?  (sofort bekannt)
      2) Signal: kommt wirklich eine Position vom GPS?       (kann im Gebäude/Stadt dauern)    */
-  const GEO_BLOCKED_HELP =
-    "Der Browser hat den Standort für diese Seite gesperrt. Öffne die Website-Einstellungen (Schloss-Symbol neben der Adresse → Berechtigungen → Standort → Erlauben). " +
-    "iPhone: Einstellungen → Safari → Standort. Danach hier „Neu fragen“.";
+  const GEO_BLOCKED_HELP = IS_IOS
+    ? "Auf dem iPhone ist der Standort für Safari oder diese Website ausgeschaltet – deshalb erscheint kein Dialog. " +
+      "1) Einstellungen → Datenschutz & Sicherheit → Ortungsdienste: einschalten und „Safari-Websites“ auf „Beim Verwenden der App“ stellen. " +
+      "2) In Safari: Adressleiste „aA“ → Website-Einstellungen → Standort → „Fragen“ oder „Erlauben“. " +
+      "(Chrome auf dem iPhone: Einstellungen → Chrome → Standort.) Danach „Neu fragen“."
+    : "Der Browser hat den Standort für diese Seite gesperrt. Öffne die Website-Einstellungen (Schloss-Symbol neben der Adresse → Berechtigungen → Standort → Erlauben). Danach „Neu fragen“.";
+
+  const IOS_NO_DIALOG_HELP =
+    "Es ist noch kein Dialog erschienen. Dann ist der Standort auf dem iPhone ausgeschaltet: Einstellungen → Datenschutz & Sicherheit → Ortungsdienste → „Safari-Websites“ → „Beim Verwenden der App“. " +
+    "Anschließend in Safari „aA“ → Website-Einstellungen → Standort → „Fragen“ und hier „Neu fragen“ tippen.";
 
   let geoStatus = null;      // PermissionStatus (falls der Browser es unterstützt)
-  let fixWatch = null, fixTimer = 0, fixSince = 0, hasFix = false;
+  let fixWatch = null, fixTimer = 0, fixSince = 0, fixRun = 0, hasFix = false;
 
   function showPermission(state) {
     if (state === "granted") setRow("geo", "ok", "ERLAUBT", "Die Seite darf den Standort nutzen.");
-    else if (state === "denied") { setRow("geo", "err", "BLOCKIERT", GEO_BLOCKED_HELP); }
+    else if (state === "denied") setRow("geo", "err", "BLOCKIERT", GEO_BLOCKED_HELP);
     else if (state === "prompt") setRow("geo", "warn", "NOCH NICHT ERLAUBT", "Bitte die Anfrage des Browsers mit „Erlauben“ bestätigen – sonst kann das Spiel dich nicht orten.");
     else setRow("geo", "wait", "UNBEKANNT", "Dieser Browser verrät den Status nicht. Er wird beim ersten Positionsempfang klar.");
   }
@@ -123,64 +129,97 @@
   }
 
   function stopFix() {
-    if (fixWatch && navigator.geolocation) { navigator.geolocation.clearWatch(fixWatch.coarse); navigator.geolocation.clearWatch(fixWatch.fine); }
+    if (fixWatch && navigator.geolocation) {
+      navigator.geolocation.clearWatch(fixWatch.coarse);
+      navigator.geolocation.clearWatch(fixWatch.fine);
+    }
     fixWatch = null;
     clearInterval(fixTimer);
   }
 
-  /** Startet die Positionssuche (löst bei Bedarf die Berechtigungs-Anfrage aus) und zeigt live den Stand */
+  /** Startet die Positionssuche und zeigt live den Stand. Muss direkt im Klick/beim Laden aufgerufen werden
+      (nicht nach einem await), damit Safari den Berechtigungs-Dialog zeigt. */
   function startFix() {
     stopFix();
+    const run = ++fixRun;
     hasFix = false;
-    if (!navigator.geolocation) { setRow("fix", "err", "NICHT VERFÜGBAR", "Dieses Gerät/dieser Browser unterstützt keine Ortung."); setRow("geo", "err", "NICHT VERFÜGBAR", ""); return; }
-    if (!window.isSecureContext) {
-      const msg = "Ortung funktioniert nur über eine sichere Verbindung (https://).";
-      setRow("geo", "err", "NICHT AKTIV", msg); setRow("fix", "err", "NICHT AKTIV", msg);
+
+    if (!navigator.geolocation) {
+      setRow("fix", "err", "NICHT VERFÜGBAR", "Dieses Gerät/dieser Browser unterstützt keine Ortung.");
+      setRow("geo", "err", "NICHT VERFÜGBAR", "");
       return;
     }
+    if (!window.isSecureContext) {
+      const msg = "Ortung funktioniert nur über eine sichere Verbindung (https://).";
+      setRow("geo", "err", "NICHT AKTIV", msg);
+      setRow("fix", "err", "NICHT AKTIV", msg);
+      return;
+    }
+
+    let best = Infinity, answered = false;
 
     fixSince = Date.now();
     const waiting = () => {
       if (hasFix) return;
       const s = Math.round((Date.now() - fixSince) / 1000);
-      setRow("fix", "wait", `SUCHE … ${s} s`, "Das GPS sucht Satelliten. Im Freien mit freiem Himmel dauert das bis ca. 30 s, zwischen Häusern oder drinnen länger – oder es klappt gar nicht.");
+      if (IS_IOS && !answered && s >= 8) setRow("fix", "warn", `KEIN DIALOG? ${s} s`, IOS_NO_DIALOG_HELP);
+      else setRow("fix", "wait", `SUCHE … ${s} s`, "Das GPS sucht Satelliten. Im Freien mit freiem Himmel dauert das bis ca. 30 s, zwischen Häusern oder drinnen länger – oder es klappt gar nicht.");
     };
     waiting();
     fixTimer = setInterval(waiting, 1000);
 
-    // Zwei Abfragen: grob (schnell, Funkzellen/WLAN) und fein (GPS) – die genauere gewinnt
-    let best = Infinity;
     const onFix = (p) => {
+      if (run !== fixRun) return;
+      answered = true;
       const acc = Math.round(p.coords.accuracy);
-      if (acc > best * 1.2 + 5 && hasFix) return;
+      if (hasFix && acc > best * 1.2 + 5) return;
       best = Math.min(best, acc);
       hasFix = true;
       clearInterval(fixTimer);
       if (acc <= 20) setRow("fix", "ok", "AKTIV", `Position empfangen – Genauigkeit ±${acc} m (live).`);
-      else setRow("fix", "warn", "UNGENAU", `Position empfangen, aber nur ±${acc} m genau. Für die Ankunft werden ±20 m benötigt – ins Freie gehen und warten.`);
+      else setRow("fix", "warn", "UNGENAU", `Position empfangen, aber nur ±${acc} m genau. Für die Ankunft werden ±30 m benötigt – ins Freie gehen und warten.`);
       showPermission("granted");
     };
+
     const onErr = (err) => {
+      if (run !== fixRun) return;
+      answered = true;
+      const reason = `Fehlermeldung des Browsers: „${err.message || "keine"}“ (Code ${err.code}).`;
       if (err.code === 1) {
         clearInterval(fixTimer);
-        setRow("geo", "err", "BLOCKIERT", GEO_BLOCKED_HELP);
+        setRow("geo", "err", "BLOCKIERT", `${GEO_BLOCKED_HELP}\n${reason}`);
         setRow("fix", "err", "KEIN ZUGRIFF", "Ohne Berechtigung gibt es kein Signal.");
       } else if (err.code === 2) {
         clearInterval(fixTimer);
-        setRow("fix", "err", "KEIN SIGNAL", "Die Position ist nicht verfügbar. Ortungsdienste des Handys einschalten (Schnelleinstellungen → Standort), „Genaue Standortbestimmung“ erlauben und ins Freie gehen. Dann „Neu suchen“.");
+        setRow("fix", "err", "KEIN SIGNAL", `Die Position ist nicht verfügbar. Ortungsdienste des Handys einschalten und ins Freie gehen, dann „Neu suchen“. ${reason}`);
       }
       // code 3 = Zeitüberschreitung: die Suche läuft weiter, der Zähler oben zeigt es
     };
-    const coarse = navigator.geolocation.watchPosition(onFix, onErr, { enableHighAccuracy: false, maximumAge: 15000, timeout: 30000 });
-    const fine = navigator.geolocation.watchPosition(onFix, onErr, { enableHighAccuracy: true, maximumAge: 0, timeout: 60000 });
-    fixWatch = { coarse, fine };
+
+    const startWatchers = () => {
+      if (run !== fixRun || fixWatch) return;
+      // grob (schnell, Funkzellen/WLAN) und fein (GPS) parallel – die genauere Messung gewinnt
+      fixWatch = {
+        coarse: navigator.geolocation.watchPosition(onFix, onErr, { enableHighAccuracy: false, maximumAge: 15000, timeout: 30000 }),
+        fine: navigator.geolocation.watchPosition(onFix, onErr, { enableHighAccuracy: true, maximumAge: 0, timeout: 60000 })
+      };
+    };
+
+    // Zuerst EINE einzelne Anfrage: sie löst den Berechtigungs-Dialog aus. Mehrere gleichzeitige
+    // Erst-Anfragen bringen Safari durcheinander. Erst danach starten die beiden Dauer-Abfragen.
+    navigator.geolocation.getCurrentPosition(
+      (p) => { onFix(p); startWatchers(); },
+      (err) => { onErr(err); if (err.code !== 1) startWatchers(); },
+      { enableHighAccuracy: false, maximumAge: 60000, timeout: 60000 }
+    );
   }
 
-
+  /** „Neu fragen“: Anfrage zuerst (direkt im Klick), danach den Status anzeigen */
   async function askGeo() {
-    showPermission(await readPermission());
     startFix();
+    showPermission(await readPermission());
   }
+
   /* ---------- Kompass & Bewegungssensoren ---------- */
   const hasPermissionApi =
     typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function";
@@ -226,7 +265,7 @@
     return new Promise((resolve) => {
       if (!("AbsoluteOrientationSensor" in window)) { resolve(false); return; }
       let sensor;
-      const finish = (v) => { try { sensor && sensor.stop(); } catch (e) { /* ignorieren */ } clearTimeout(timer); resolve(v); };
+      const finish = (v) => { try { sensor && sensor.stop(); } catch (e) { /* schon gestoppt */ } clearTimeout(timer); resolve(v); };
       const timer = setTimeout(() => finish(false), ms);
       try {
         sensor = new AbsoluteOrientationSensor({ frequency: 20 });
@@ -263,7 +302,7 @@
         return;
       }
       if (perm.includes("denied")) {
-        const msg = "Zugriff abgelehnt. iPhone: Einstellungen → Safari → „Bewegung & Ausrichtung“ erlauben (oder Website-Daten löschen), dann „Neu fragen“. Ohne Kompass nutzt das Radar die Gehrichtung.";
+        const msg = "Zugriff abgelehnt. iPhone: Safari schließen und neu öffnen, dann „Neu fragen“ und „Erlauben“ wählen (oder Einstellungen → Safari → Erweitert → Website-Daten löschen). Ohne Kompass nutzt das Radar die Gehrichtung.";
         setRow("compass", "err", "BLOCKIERT", msg);
         setRow("motion", "err", "BLOCKIERT", msg);
         return;
@@ -302,27 +341,28 @@
   document.querySelectorAll("[data-ask]").forEach((btn) =>
     btn.addEventListener("click", () => ASK[btn.dataset.ask]()));
 
-  // Safari: Sensor-Abfrage zuerst starten, solange die Nutzer-Geste noch frisch ist
+  // Safari: Sensor-Abfrage und Standort zuerst starten, solange die Nutzer-Geste noch frisch ist
   $("all").addEventListener("click", () => { askSensors(); askGeo(); askWake(); });
 
   /* ---------- Start: beim Laden automatisch alles abfragen ---------- */
   async function autoStart() {
-    const sec = $("secure");
-    sec.textContent = window.isSecureContext
-      ? "Verbindung: sicher (https) ✔"
-      : "Verbindung: NICHT sicher – Standort und Sensoren funktionieren nur über https://";
-    sec.classList.toggle("bad", !window.isSecureContext);
-
-    // Berechtigung sofort anzeigen, Positionssuche starten, bei Änderung (z. B. in den Einstellungen erlaubt) nachziehen
-    const state = await readPermission();
-    showPermission(state);
-    if (state === "denied") setRow("fix", "err", "KEIN ZUGRIFF", "Ohne Berechtigung gibt es kein Signal.");
-    else startFix();
-    try {
-      geoStatus.addEventListener("change", () => { showPermission(geoStatus.state); if (geoStatus.state !== "denied") startFix(); });
-    } catch (e) { /* nicht unterstützt */ }
+    // Positionssuche sofort starten (auch wenn der Browser „gesperrt“ meldet: dann kommt die genaue Fehlermeldung)
+    startFix();
     askSensors();
     askWake();
+
+    const state = await readPermission();
+    showPermission(state);
+
+    const diag = $("diag");
+    diag.textContent = `Verbindung: ${window.isSecureContext ? "sicher (https) ✔" : "NICHT sicher – Standort und Sensoren funktionieren nur über https://"}` +
+      ` · Gerät: ${IS_IOS ? "iPhone/iPad" : "Android/Computer"} · Standort-Status laut Browser: ${state}`;
+    diag.classList.toggle("bad", !window.isSecureContext);
+
+    // Wird der Standort später erlaubt (z. B. in den Einstellungen), geht es von selbst weiter
+    try {
+      geoStatus.addEventListener("change", () => { showPermission(geoStatus.state); if (geoStatus.state !== "denied") startFix(); });
+    } catch (e) { /* Browser kennt keine Berechtigungs-Events */ }
   }
   autoStart();
   </script>

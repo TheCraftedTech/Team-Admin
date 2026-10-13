@@ -172,6 +172,7 @@
      Hilfsfunktionen
      ====================================================================== */
   const $ = (id) => document.getElementById(id);
+  const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
   const rad = (d) => (d * Math.PI) / 180;
   const deg = (r) => (r * 180) / Math.PI;
@@ -387,20 +388,42 @@
   }
   setInterval(updateNote, 1000);
 
-  function startTracking() {
+  let probeAt = 0;          // Zeitpunkt der laufenden Erst-Anfrage (0 = keine)
+
+  /** Zwei Dauer-Abfragen: grob (kommt in Sekunden, auch in Gebäuden) und fein (echtes GPS, braucht Sicht zum Himmel) */
+  function beginWatching() {
     if (watchIds.length) return;
-    if (!navigator.geolocation) { gpsError = "DIESES GERÄT UNTERSTÜTZT KEINE ORTUNG"; updateNote(); return; }
-    if (!pos) trackStart = Date.now();
-    // Zwei Abfragen parallel: grob (kommt in Sekunden, auch in Gebäuden) und fein (echtes GPS, braucht Sicht zum Himmel)
     watchIds = [
       navigator.geolocation.watchPosition(onPosition, onPositionError, { enableHighAccuracy: false, maximumAge: 15000, timeout: 30000 }),
       navigator.geolocation.watchPosition(onPosition, onPositionError, { enableHighAccuracy: true,  maximumAge: 0,     timeout: 60000 })
     ];
+  }
+
+  /** Zuerst EINE einzelne Anfrage (sie löst den Berechtigungs-Dialog aus – mehrere gleichzeitige Erst-Anfragen
+      bringen Safari durcheinander), danach die Dauer-Abfragen. */
+  function startTracking() {
+    if (watchIds.length) return;
+    if (!navigator.geolocation) { gpsError = "DIESES GERÄT UNTERSTÜTZT KEINE ORTUNG"; updateNote(); return; }
+    if (probeAt && Date.now() - probeAt < 15000) return;
+    if (!pos) trackStart = Date.now();
+    probeAt = Date.now();
+    navigator.geolocation.getCurrentPosition(
+      (p) => { probeAt = 0; onPosition(p); beginWatching(); },
+      (err) => { probeAt = 0; onPositionError(err); if (err.code !== 1) beginWatching(); },
+      { enableHighAccuracy: false, maximumAge: 60000, timeout: 60000 }
+    );
     updateNote();
   }
   function stopTracking() {
     if (navigator.geolocation) watchIds.forEach((id) => navigator.geolocation.clearWatch(id));
     watchIds = [];
+  }
+
+  /** Abfrage neu anstoßen – auch aus einer Berührung heraus (iOS zeigt den Dialog dann sicher) */
+  function restartTracking() {
+    probeAt = 0;
+    stopTracking();
+    startTracking();
   }
 
   function onPosition(p) {
@@ -421,7 +444,9 @@
     if (err.code === 1) {
       stopTracking();
       pos = null;
-      gpsError = "STANDORT BLOCKIERT – bitte in den Browser-Einstellungen für diese Seite erlauben";
+      gpsError = IS_IOS
+        ? "STANDORT AUS – iPhone: Einstellungen → Datenschutz & Sicherheit → Ortungsdienste → Safari-Websites → „Beim Verwenden“"
+        : "STANDORT BLOCKIERT – bitte in den Browser-Einstellungen für diese Seite erlauben";
     } else if (err.code === 2) {
       gpsError = "KEIN GPS-SIGNAL – ORTUNGSDIENSTE DES HANDYS EINSCHALTEN, INS FREIE GEHEN";
     }
@@ -431,7 +456,7 @@
 
   // Nach Display-Sperre / App-Wechsel hängen die Abfragen oft fest → neu starten
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && !gpsError.startsWith("STANDORT BLOCKIERT")) { stopTracking(); startTracking(); }
+    if (document.visibilityState === "visible") restartTracking();
   });
 
   /* ======================================================================
@@ -481,7 +506,6 @@
     if (finished()) { vibrateOnce(); burst = 1; }
     syncUI();
     refresh();
-    window.scrollTo({ top: 0 });
   }
 
   function vibrateOnce() {
@@ -501,6 +525,7 @@
       state.introDone = true;
       saveState();
       silentOrientationRequest();      // iOS: Kompass-Freigabe direkt aus dem Tipp
+      if (!pos) restartTracking();     // noch keine Position: Standort-Abfrage aus dem Tipp heraus neu anstoßen
       requestWake();
       syncUI();
       refresh();
@@ -672,51 +697,6 @@
       status.addEventListener("change", () => { if (status.state !== "denied") startTracking(); });
     });
   } catch (e) { /* nicht unterstützt */ }
-  </script>
-</body>
-</html>
-      const capture = Math.max(7, (REACH_RADIUS / rangeDisp) * R);
-      g.strokeStyle = "rgba(0, 255, 102, 0.8)"; g.lineWidth = 1.5;
-      g.setLineDash([3, 4]);
-      g.beginPath(); g.arc(dot.x, dot.y, capture, 0, Math.PI * 2); g.stroke();
-      g.setLineDash([]);
-
-      // Puls: je näher, desto schneller
-      const period = 0.35 + 2.2 * clamp(pos.dist / 120, 0, 1);
-      phase = (phase + dt / period) % 1;
-      g.strokeStyle = `rgba(0, 240, 255, ${1 - phase})`; g.lineWidth = 3;
-      g.beginPath(); g.arc(dot.x, dot.y, 8 + phase * 36, 0, Math.PI * 2); g.stroke();
-
-      g.fillStyle = "#00f0ff"; g.shadowColor = "#00f0ff"; g.shadowBlur = 16;
-      g.beginPath(); g.arc(dot.x, dot.y, 7 + (1 - phase) * 3, 0, Math.PI * 2); g.fill();
-      g.shadowBlur = 0;
-    }
-
-    // Blitz beim Erreichen eines Wegpunkts
-    if (burst > 0) {
-      g.strokeStyle = `rgba(0, 255, 102, ${burst})`; g.lineWidth = 4;
-      g.beginPath(); g.arc(cx, cy, (1 - burst) * R, 0, Math.PI * 2); g.stroke();
-      burst = Math.max(0, burst - dt * 1.2);
-    }
-
-    // Eigener Standort (zeigt nach oben = Blickrichtung)
-    g.fillStyle = "#00ff66"; g.shadowColor = "#00ff66"; g.shadowBlur = 12;
-    g.beginPath(); g.moveTo(cx, cy - 14); g.lineTo(cx + 9, cy + 10); g.lineTo(cx - 9, cy + 10); g.closePath(); g.fill();
-    g.shadowBlur = 0;
-  }
-  requestAnimationFrame(frame);
-
-  /* ======================================================================
-     Start
-     ====================================================================== */
-  if (finished()) { $("end").hidden = false; setText(distEl, "ENTFERNUNG: 0 m"); }
-  initPermissions();
-
-  // Test-Hilfe: index.html?debug zeigt einen Button zum Überspringen
-  if (new URLSearchParams(location.search).has("debug")) {
-    $("dbg").hidden = false;
-    $("dbg").addEventListener("click", () => { if (!finished()) reached(); });
-  }
   </script>
 </body>
 </html>
