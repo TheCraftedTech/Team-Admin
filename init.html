@@ -48,9 +48,14 @@
 
   <ul>
     <li id="r-geo" data-state="wait">
-      <div class="info"><b>Standort (GPS)</b><span class="detail"></span></div>
+      <div class="info"><b>Standort-Berechtigung</b><span class="detail"></span></div>
       <span class="status">PRÜFE …</span>
       <button type="button" data-ask="geo">Neu fragen</button>
+    </li>
+    <li id="r-fix" data-state="wait">
+      <div class="info"><b>GPS-Signal (Position)</b><span class="detail"></span></div>
+      <span class="status">PRÜFE …</span>
+      <button type="button" data-ask="fix">Neu suchen</button>
     </li>
     <li id="r-compass" data-state="wait">
       <div class="info"><b>Kompass / Ausrichtung</b><span class="detail"></span></div>
@@ -93,52 +98,89 @@
     row.querySelector(".detail").textContent = detail || "";
   }
 
-  /* ---------- Standort ---------- */
-  let geoBusy = false;
-
-  async function geoPermissionState() {
-    try { return (await navigator.permissions.query({ name: "geolocation" })).state; } catch (e) { return "unknown"; }
-  }
-
+  /* ---------- Standort: Berechtigung und Signal sind zwei verschiedene Dinge ----------
+     1) Berechtigung: darf die Seite den Standort nutzen?  (sofort bekannt)
+     2) Signal: kommt wirklich eine Position vom GPS?       (kann im Gebäude/Stadt dauern)    */
   const GEO_BLOCKED_HELP =
     "Der Browser hat den Standort für diese Seite gesperrt. Öffne die Website-Einstellungen (Schloss-Symbol neben der Adresse → Berechtigungen → Standort → Erlauben). " +
     "iPhone: Einstellungen → Safari → Standort. Danach hier „Neu fragen“.";
 
-  async function askGeo() {
-    if (geoBusy) return;
-    geoBusy = true;
-    try {
-      if (!navigator.geolocation) { setRow("geo", "err", "NICHT VERFÜGBAR", "Dieses Gerät/dieser Browser unterstützt keine Ortung."); return; }
-      if (!window.isSecureContext) { setRow("geo", "err", "NICHT AKTIV", "Ortung funktioniert nur über eine sichere Verbindung (https://)."); return; }
+  let geoStatus = null;      // PermissionStatus (falls der Browser es unterstützt)
+  let fixWatch = null, fixTimer = 0, fixSince = 0, hasFix = false;
 
-      setRow("geo", "wait", "FRAGT …", "Bitte die Anfrage des Browsers mit „Erlauben“ bestätigen.");
-      const result = await new Promise((resolve) => {
-        navigator.geolocation.getCurrentPosition(
-          (p) => resolve({ ok: true, p }),
-          (err) => resolve({ ok: false, err }),
-          { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
-        );
-      });
-
-      if (result.ok) {
-        setRow("geo", "ok", "AKTIV", `Position empfangen (Genauigkeit ±${Math.round(result.p.coords.accuracy)} m).`);
-       
-      } else if (result.err.code === 1) {
-        setRow("geo", "err", "BLOCKIERT", GEO_BLOCKED_HELP);
-       
-      } else {
-        // Erlaubt, aber noch kein GPS-Fix (Timeout) oder Ortungsdienste des Handys sind aus
-        const state = await geoPermissionState();
-        const granted = state === "granted" || state === "unknown";
-        setRow("geo", granted ? "warn" : "err", granted ? "ERLAUBT, KEIN SIGNAL" : "NICHT AKTIV",
-          "Noch keine Position. Ins Freie gehen und prüfen, ob die Ortungsdienste des Handys eingeschaltet sind.");
-       
-      }
-    } finally {
-      geoBusy = false;
-    }
+  function showPermission(state) {
+    if (state === "granted") setRow("geo", "ok", "ERLAUBT", "Die Seite darf den Standort nutzen.");
+    else if (state === "denied") { setRow("geo", "err", "BLOCKIERT", GEO_BLOCKED_HELP); }
+    else if (state === "prompt") setRow("geo", "warn", "NOCH NICHT ERLAUBT", "Bitte die Anfrage des Browsers mit „Erlauben“ bestätigen – sonst kann das Spiel dich nicht orten.");
+    else setRow("geo", "wait", "UNBEKANNT", "Dieser Browser verrät den Status nicht. Er wird beim ersten Positionsempfang klar.");
   }
 
+  async function readPermission() {
+    try {
+      geoStatus = geoStatus || await navigator.permissions.query({ name: "geolocation" });
+      return geoStatus.state;
+    } catch (e) { return "unknown"; }
+  }
+
+  function stopFix() {
+    if (fixWatch && navigator.geolocation) { navigator.geolocation.clearWatch(fixWatch.coarse); navigator.geolocation.clearWatch(fixWatch.fine); }
+    fixWatch = null;
+    clearInterval(fixTimer);
+  }
+
+  /** Startet die Positionssuche (löst bei Bedarf die Berechtigungs-Anfrage aus) und zeigt live den Stand */
+  function startFix() {
+    stopFix();
+    hasFix = false;
+    if (!navigator.geolocation) { setRow("fix", "err", "NICHT VERFÜGBAR", "Dieses Gerät/dieser Browser unterstützt keine Ortung."); setRow("geo", "err", "NICHT VERFÜGBAR", ""); return; }
+    if (!window.isSecureContext) {
+      const msg = "Ortung funktioniert nur über eine sichere Verbindung (https://).";
+      setRow("geo", "err", "NICHT AKTIV", msg); setRow("fix", "err", "NICHT AKTIV", msg);
+      return;
+    }
+
+    fixSince = Date.now();
+    const waiting = () => {
+      if (hasFix) return;
+      const s = Math.round((Date.now() - fixSince) / 1000);
+      setRow("fix", "wait", `SUCHE … ${s} s`, "Das GPS sucht Satelliten. Im Freien mit freiem Himmel dauert das bis ca. 30 s, zwischen Häusern oder drinnen länger – oder es klappt gar nicht.");
+    };
+    waiting();
+    fixTimer = setInterval(waiting, 1000);
+
+    // Zwei Abfragen: grob (schnell, Funkzellen/WLAN) und fein (GPS) – die genauere gewinnt
+    let best = Infinity;
+    const onFix = (p) => {
+      const acc = Math.round(p.coords.accuracy);
+      if (acc > best * 1.2 + 5 && hasFix) return;
+      best = Math.min(best, acc);
+      hasFix = true;
+      clearInterval(fixTimer);
+      if (acc <= 20) setRow("fix", "ok", "AKTIV", `Position empfangen – Genauigkeit ±${acc} m (live).`);
+      else setRow("fix", "warn", "UNGENAU", `Position empfangen, aber nur ±${acc} m genau. Für die Ankunft werden ±20 m benötigt – ins Freie gehen und warten.`);
+      showPermission("granted");
+    };
+    const onErr = (err) => {
+      if (err.code === 1) {
+        clearInterval(fixTimer);
+        setRow("geo", "err", "BLOCKIERT", GEO_BLOCKED_HELP);
+        setRow("fix", "err", "KEIN ZUGRIFF", "Ohne Berechtigung gibt es kein Signal.");
+      } else if (err.code === 2) {
+        clearInterval(fixTimer);
+        setRow("fix", "err", "KEIN SIGNAL", "Die Position ist nicht verfügbar. Ortungsdienste des Handys einschalten (Schnelleinstellungen → Standort), „Genaue Standortbestimmung“ erlauben und ins Freie gehen. Dann „Neu suchen“.");
+      }
+      // code 3 = Zeitüberschreitung: die Suche läuft weiter, der Zähler oben zeigt es
+    };
+    const coarse = navigator.geolocation.watchPosition(onFix, onErr, { enableHighAccuracy: false, maximumAge: 15000, timeout: 30000 });
+    const fine = navigator.geolocation.watchPosition(onFix, onErr, { enableHighAccuracy: true, maximumAge: 0, timeout: 60000 });
+    fixWatch = { coarse, fine };
+  }
+
+
+  async function askGeo() {
+    showPermission(await readPermission());
+    startFix();
+  }
   /* ---------- Kompass & Bewegungssensoren ---------- */
   const hasPermissionApi =
     typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function";
@@ -256,7 +298,7 @@
   }
 
   /* ---------- Bedienung ---------- */
-  const ASK = { geo: askGeo, compass: askSensors, motion: askSensors, wake: askWake };
+  const ASK = { geo: askGeo, fix: startFix, compass: askSensors, motion: askSensors, wake: askWake };
   document.querySelectorAll("[data-ask]").forEach((btn) =>
     btn.addEventListener("click", () => ASK[btn.dataset.ask]()));
 
@@ -271,16 +313,14 @@
       : "Verbindung: NICHT sicher – Standort und Sensoren funktionieren nur über https://";
     sec.classList.toggle("bad", !window.isSecureContext);
 
-    // Standort-Status sofort anzeigen und bei Änderung (z. B. in den Einstellungen erlaubt) nachziehen
-    const state = await geoPermissionState();
-    if (state === "denied") { setRow("geo", "err", "BLOCKIERT", GEO_BLOCKED_HELP); }
-    else askGeo();
-
+    // Berechtigung sofort anzeigen, Positionssuche starten, bei Änderung (z. B. in den Einstellungen erlaubt) nachziehen
+    const state = await readPermission();
+    showPermission(state);
+    if (state === "denied") setRow("fix", "err", "KEIN ZUGRIFF", "Ohne Berechtigung gibt es kein Signal.");
+    else startFix();
     try {
-      const status = await navigator.permissions.query({ name: "geolocation" });
-      status.addEventListener("change", () => { if (status.state === "denied") { setRow("geo", "err", "BLOCKIERT", GEO_BLOCKED_HELP); } else askGeo(); });
+      geoStatus.addEventListener("change", () => { showPermission(geoStatus.state); if (geoStatus.state !== "denied") startFix(); });
     } catch (e) { /* nicht unterstützt */ }
-
     askSensors();
     askWake();
   }

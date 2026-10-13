@@ -105,14 +105,10 @@
     @keyframes breathe { 50% { box-shadow: 0 0 34px rgba(0, 255, 102, 0.7); } }
 
     /* ---------- Ziel erreicht ---------- */
-    .end {
-      position: fixed; inset: 0; z-index: 18;
-      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
-      text-align: center; padding: 24px;
-      background: rgba(3, 3, 7, 0.78);
-    }
+    .end { position: fixed; inset: 0; z-index: 18; background: var(--bg); overflow-y: auto; -webkit-overflow-scrolling: touch; user-select: text; -webkit-user-select: text; }
+    .end .page { text-align: center; min-height: 100%; justify-content: center; }
     .end h2 { font-size: clamp(28px, 9vw, 44px); letter-spacing: 5px; animation: glow 2s ease-in-out infinite alternate; }
-    .end p { color: var(--cyan); letter-spacing: 3px; font-size: 13px; }
+    .end .sub { color: var(--cyan); letter-spacing: 3px; font-size: 13px; }
     @keyframes glow { to { text-shadow: 0 0 22px var(--green), 0 0 44px var(--cyan); } }
   </style>
 </head>
@@ -123,7 +119,7 @@
     <div class="dist" id="dist">ENTFERNUNG: – – –</div>
     <div class="note" id="note"></div>
     <div class="dots" id="dots" aria-hidden="true"></div>
-    <button class="next" id="skip" type="button">Zum nächsten Ort ›</button>
+    <button class="next" id="skip" type="button">Ort überspringen ›</button>
   </footer>
 
   <!-- Info-Seite: erscheint beim ersten Start, danach öffnet sich das Radar -->
@@ -132,10 +128,8 @@
   <!-- „Du bist da“-Meldung -->
   <section class="sheet" id="arrive" hidden></section>
 
-  <section class="end" id="end" hidden>
-    <h2>ZIEL ERREICHT</h2>
-    <p>DIE ERDE IST GERETTET</p>
-  </section>
+  <!-- Abschluss nach dem letzten Ort -->
+  <section class="end" id="end" hidden></section>
 
   <script>
   "use strict";
@@ -146,7 +140,7 @@
   const REACH_RADIUS = 10;        // Meter: so nah muss man am Ort sein
   const MAX_ACCURACY = 20;        // Meter: GPS muss mindestens so genau sein, sonst zählt die Ankunft nicht
   const ARRIVE_FIXES = 2;         // So viele GPS-Messungen in Folge müssen im Radius liegen
-  const ALLOW_SKIP = true;        // Unten „Zum nächsten Ort“ (mit doppeltem Tippen) – false = nur per Ankunft
+  const ALLOW_SKIP = true;        // Unten „Ort überspringen“ (Notausgang, doppeltes Tippen) – false = nur per Ankunft
   const STORAGE_KEY = "alienRadar.v2";   // reset.html leert den gesamten localStorage
 
   /* ======================================================================
@@ -161,6 +155,15 @@
       { image: "", caption: "BILD-PLATZHALTER 3", text: "Platzhaltertext: Wenn ihr bereit seid, tippt unten auf „Fertig“. Dann öffnet sich das Radar und führt euch zum ersten Ort." }
     ],
     button: "FERTIG"
+  };
+
+  /* Abschluss-Seite nach dem letzten Ort (Platzhalter: Bild + Text) */
+  const END = {
+    title: "ZIEL ERREICHT",
+    subtitle: "DIE ERDE IST GERETTET",
+    image: "",
+    caption: "BILD-PLATZHALTER",
+    text: "Platzhaltertext: Glückwunsch, ihr habt alle Orte gefunden! Hier steht der Abschluss der Geschichte und wie es weitergeht (Treffpunkt, Auswertung, Preise …)."
   };
 
   /* ======================================================================
@@ -370,9 +373,11 @@
   /* ======================================================================
      GPS-Tracking
      ====================================================================== */
-  let pos = null;           // { lat, lng, acc, dist, brg }
-  let watchId = null;
+  let pos = null;           // { lat, lng, acc, t, dist, brg }
+  let watchIds = [];
   let insideCount = 0;      // aufeinanderfolgende Messungen im Radius
+  let gpsError = "";        // Fehlermeldung (leer = alles in Ordnung)
+  let trackStart = Date.now();
 
   const distEl = $("dist"), noteEl = $("note");
   function setNote(text, isError) {
@@ -380,37 +385,65 @@
     noteEl.classList.toggle("err", Boolean(isError));
   }
 
+  /** Statuszeile unter der Entfernung – zeigt immer, was das GPS gerade macht */
+  function updateNote() {
+    if (gpsError) { setNote(gpsError, true); return; }
+    if (finished()) { setNote("", false); return; }
+    if (!pos) { setNote(`SUCHE GPS-SIGNAL … ${Math.round((Date.now() - trackStart) / 1000)} s`, false); return; }
+    const age = (Date.now() - pos.t) / 1000;
+    if (age > 10) setNote(`GPS-SIGNAL VERLOREN (${Math.round(age)} s) – BITTE INS FREIE`, false);
+    else if (pos.dist !== undefined && pos.dist <= REACH_RADIUS * 3 && pos.acc > MAX_ACCURACY) setNote(`GPS NOCH UNGENAU (±${Math.round(pos.acc)} m) – BITTE WARTEN`, false);
+    else if (compassAcc !== null && (compassAcc < 0 || compassAcc > 30)) setNote("KOMPASS UNGENAU – HANDY IN EINER 8 SCHWENKEN", false);
+    else setNote(`GPS ±${Math.round(pos.acc)} m`, false);
+  }
+  setInterval(updateNote, 1000);
+
   function startTracking() {
-    if (watchId !== null) return;
-    if (!navigator.geolocation) { setNote("DIESES GERÄT UNTERSTÜTZT KEINE ORTUNG", true); return; }
-    setNote("SUCHE GPS-SIGNAL …");
-    watchId = navigator.geolocation.watchPosition(onPosition, onPositionError, {
-      enableHighAccuracy: true, maximumAge: 0, timeout: 20000
-    });
+    if (watchIds.length) return;
+    if (!navigator.geolocation) { gpsError = "DIESES GERÄT UNTERSTÜTZT KEINE ORTUNG"; updateNote(); return; }
+    if (!pos) trackStart = Date.now();
+    // Zwei Abfragen parallel: grob (kommt in Sekunden, auch in Gebäuden) und fein (echtes GPS, braucht Sicht zum Himmel)
+    watchIds = [
+      navigator.geolocation.watchPosition(onPosition, onPositionError, { enableHighAccuracy: false, maximumAge: 15000, timeout: 30000 }),
+      navigator.geolocation.watchPosition(onPosition, onPositionError, { enableHighAccuracy: true,  maximumAge: 0,     timeout: 60000 })
+    ];
+    updateNote();
   }
   function stopTracking() {
-    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-    watchId = null;
+    if (navigator.geolocation) watchIds.forEach((id) => navigator.geolocation.clearWatch(id));
+    watchIds = [];
   }
 
   function onPosition(p) {
-    pos = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy };
+    const acc = p.coords.accuracy, now = Date.now();
+    // Eine deutlich schlechtere (grobe) Messung überschreibt keine frische, genaue
+    if (pos && now - pos.t < 6000 && acc > pos.acc * 1.2 + 5) return;
+    gpsError = "";
+    pos = { lat: p.coords.latitude, lng: p.coords.longitude, acc, t: now };
     // Bewegungsrichtung laut GPS (nur beim Gehen verlässlich) – Reserve, falls kein Kompass da ist
     const { heading: gh, speed } = p.coords;
     if (typeof gh === "number" && !Number.isNaN(gh) && (speed || 0) > 0.8) { gpsHd = gh; gpsAt = performance.now(); }
     resolveHeading();
     refresh();
+    updateNote();
   }
 
   function onPositionError(err) {
     if (err.code === 1) {
       stopTracking();
       pos = null;
-      setNote("STANDORT BLOCKIERT – bitte in den Browser-Einstellungen für diese Seite erlauben", true);
-      return;
+      gpsError = "STANDORT BLOCKIERT – bitte in den Browser-Einstellungen für diese Seite erlauben";
+    } else if (err.code === 2) {
+      gpsError = "KEIN GPS-SIGNAL – ORTUNGSDIENSTE DES HANDYS EINSCHALTEN, INS FREIE GEHEN";
     }
-    setNote(err.code === 2 ? "KEIN GPS-SIGNAL – BITTE INS FREIE GEHEN" : "SUCHE GPS-SIGNAL …");
+    // code 3 (Zeitüberschreitung): GPS sucht weiter – die Statuszeile zählt die Sekunden mit
+    updateNote();
   }
+
+  // Nach Display-Sperre / App-Wechsel hängen die Abfragen oft fest → neu starten
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && !gpsError.startsWith("STANDORT BLOCKIERT")) { stopTracking(); startTracking(); }
+  });
 
   /* ======================================================================
      Spiel-Logik: Ankunft ≠ automatisch weiter. Erst „Du bist da“, dann Button.
@@ -437,17 +470,12 @@
   function updateReadout() {
     if (!pos || pos.dist === undefined || finished()) return;
     setText(distEl, `ENTFERNUNG: ${formatMeters(pos.dist)}`);
-
-    let note = "", err = false;
-    if (pos.dist <= REACH_RADIUS * 3 && pos.acc > MAX_ACCURACY) { note = `GPS NOCH UNGENAU (±${Math.round(pos.acc)} m) – BITTE WARTEN`; }
-    else if (compassAcc !== null && (compassAcc < 0 || compassAcc > 30)) { note = "KOMPASS UNGENAU – HANDY IN EINER 8 SCHWENKEN"; }
-    setNote(note, err);
+    updateNote();
     updateSkipLabel();
   }
 
   function arrive() {
-    if (state.index >= WAYPOINTS.length - 1) { advance(); return; }   // letzter Ort → direkt Ziel
-    state.arrived = true;
+    state.arrived = true;     // auch am letzten Ort: erst „Du bist da“, dann „Abschließen“
     saveState();
     vibrateOnce();
     burst = 1;
@@ -494,13 +522,23 @@
 
   function buildArrival() {
     const wp = WAYPOINTS[state.index];
-    const next = h("button", "go", "ZUM NÄCHSTEN ORT ›");
+    const isLast = state.index >= WAYPOINTS.length - 1;
+    const next = h("button", "go", isLast ? "ABSCHLIESSEN ›" : "ZUM NÄCHSTEN ORT ›");
     next.type = "button";
     next.addEventListener("click", advance);
     const title = h("h2", "", "DU BIST ");
     title.append(h("span", "", "DA"));
     arriveEl.replaceChildren(h("div", "page", "", [title, imageBlock(wp.image, "BILD-PLATZHALTER"), h("p", "", wp.text || ""), next]));
     arriveEl.scrollTop = 0;
+  }
+
+  function buildEnd() {
+    endEl.replaceChildren(h("div", "page", "", [
+      h("h2", "", END.title),
+      h("p", "sub", END.subtitle),
+      imageBlock(END.image, END.caption),
+      h("p", "", END.text)
+    ]));
   }
 
   let arriveBuiltFor = -1;
@@ -517,6 +555,7 @@
     if (!showArrive) arriveBuiltFor = -1;
 
     endEl.hidden = !finished();
+    if (finished() && !endEl.firstChild) buildEnd();
     if (finished()) { setText(distEl, "ENTFERNUNG: 0 m"); setNote("", false); }
 
     skipBtn.hidden = !(ALLOW_SKIP && playing() && !state.arrived);
@@ -526,16 +565,17 @@
     [...dotsEl.children].forEach((d, i) => { d.className = i < state.index ? "done" : i === state.index ? "now" : ""; });
   }
 
-  /* Unten: „Zum nächsten Ort“ – erst nach zweitem Tippen (verhindert versehentliches Überspringen) */
+  /* Unten: „Ort überspringen“ (Notausgang, falls das GPS nicht klappt) – erst nach zweitem Tippen */
+  const SKIP_LABEL = "Ort überspringen ›";
   let skipArmed = false, skipTimer = 0;
   function updateSkipLabel() {
-    if (skipArmed && pos && pos.dist !== undefined) skipBtn.textContent = `NOCH ${formatMeters(pos.dist)} – NOCHMAL TIPPEN`;
+    if (skipArmed && pos && pos.dist !== undefined) skipBtn.textContent = `NOCH ${formatMeters(pos.dist)} – NOCHMAL TIPPEN ZUM ÜBERSPRINGEN`;
   }
   skipBtn.addEventListener("click", () => {
     if (!skipArmed) {
       skipArmed = true;
       skipBtn.classList.add("armed");
-      skipBtn.textContent = pos && pos.dist !== undefined ? `NOCH ${formatMeters(pos.dist)} – NOCHMAL TIPPEN` : "NOCHMAL TIPPEN ZUM ÜBERSPRINGEN";
+      skipBtn.textContent = pos && pos.dist !== undefined ? `NOCH ${formatMeters(pos.dist)} – NOCHMAL TIPPEN ZUM ÜBERSPRINGEN` : "NOCHMAL TIPPEN ZUM ÜBERSPRINGEN";
       skipTimer = setTimeout(resetSkip, 4000);
       return;
     }
@@ -546,7 +586,7 @@
     clearTimeout(skipTimer);
     skipArmed = false;
     skipBtn.classList.remove("armed");
-    skipBtn.textContent = "Zum nächsten Ort ›";
+    skipBtn.textContent = SKIP_LABEL;
   }
 
   setInterval(resolveHeading, 500);   // Quelle wechseln, wenn der Kompass ausfällt
