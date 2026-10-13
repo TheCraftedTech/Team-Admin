@@ -24,12 +24,6 @@ function h(tag, cls, text, children) {
   return n;
 }
 
-/** Bild oder gestrichelte Platzhalterfläche */
-function imageBlock(src, caption) {
-  if (src) { const img = document.createElement("img"); img.src = src; img.alt = caption || ""; img.loading = "lazy"; return img; }
-  return h("div", "ph", caption || "BILD-PLATZHALTER");
-}
-
 function distanceMeters(lat1, lon1, lat2, lon2) {
   const R = 6371000;
   const dLat = rad(lat2 - lat1), dLon = rad(lon2 - lon1);

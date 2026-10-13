@@ -1,10 +1,10 @@
 /* ==========================================================================
    modules.js – die Module (jeweils eine eigene Oberfläche und Mechanik)
    --------------------------------------------------------------------------
-   info      Text-/Bildseite zum Durchlesen
+   info      Seite zum Durchlesen (Inhalt aus einer Markdown-Datei)
    locate    Ortungs-Radar zu einem Ort, „WEITER“ erst am Ort
-   password  Eingabefeld für ein Passwort
-   end       Abschlussseite
+   password  Eingabefeld für ein Passwort (Text darüber aus Markdown)
+   end       Abschlussseite (Inhalt aus einer Markdown-Datei)
    Inhalte und Reihenfolge stehen in steps.js, die Steuerung in core.js.
    Jedes Modul hat genau einen Haupt-Button mit der Klasse „go“ (die Debug-Seite findet ihn damit).
    ========================================================================== */
@@ -15,16 +15,16 @@
    ====================================================================== */
 registerModule("info", (ctx) => {
   const S = ctx.step;
-  const sections = (S.sections || []).map((s) => h("div", "block", "", [imageBlock(s.image, s.caption), h("p", "", s.text)]));
+  const content = h("div", "md");
   const button = h("button", "go", S.button || "WEITER");
   button.type = "button";
   button.addEventListener("click", () => ctx.next());
 
-  const scroller = h("div", "scroller", "", [h("div", "page", "", [h("h1", "", S.heading || ""), ...sections, button])]);
-  ctx.root.append(scroller);
+  ctx.root.append(h("div", "scroller", "", [h("div", "page", "", [content, button])]));
+  fillMarkdown(content, S.md);
 
   return {
-    info: () => ({ type: "info" })
+    info: () => ({ type: "info", md: S.md })
   };
 });
 
@@ -33,17 +33,13 @@ registerModule("info", (ctx) => {
    ====================================================================== */
 registerModule("end", (ctx) => {
   const S = ctx.step;
-  const page = h("div", "page", "", [
-    h("h2", "", S.heading || ""),
-    h("p", "sub", S.subtitle || ""),
-    imageBlock(S.image, S.caption),
-    h("p", "", S.text || "")
-  ]);
-  ctx.root.append(h("div", "scroller end", "", [page]));
+  const content = h("div", "md");
+  ctx.root.append(h("div", "scroller end", "", [h("div", "page", "", [content])]));
+  fillMarkdown(content, S.md);
   vibrateOnce();
 
   return {
-    info: () => ({ type: "end" })
+    info: () => ({ type: "end", md: S.md })
   };
 });
 
@@ -73,9 +69,11 @@ registerModule("password", (ctx) => {
   form.noValidate = true;
 
   const parts = [];
-  if (S.heading) parts.push(h("h1", "", S.heading));
-  if ("image" in S) parts.push(imageBlock(S.image, S.caption));
-  if (S.text) parts.push(h("p", "", S.text));
+  if (S.md) {
+    const content = h("div", "md");
+    parts.push(content);
+    fillMarkdown(content, S.md);
+  }
   parts.push(form, feedback);
 
   const page = h("div", "page", "", parts);

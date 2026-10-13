@@ -340,6 +340,7 @@
     if (s.step.type === "password") $("answers").textContent = `Richtig: ${(s.step.answers || []).join(", ")}`;
 
     const lines = [`Schritt ${s.index + 1} / ${s.total}: ${s.step.title || s.step.id}  [${s.step.type}]`];
+    if (s.step.md) lines.push(`Inhalt: content/${s.step.md}.md`);
     if (s.step.type === "locate" && s.info) {
       lines.push(`Entfernung: ${s.info.dist === null ? "–" : Math.round(s.info.dist) + " m"}   Angekommen: ${s.info.arrived ? "JA (WEITER sichtbar)" : "nein"}`);
       lines.push(`Regel: Radius ${s.info.radius} m, Genauigkeit ≤ ${s.info.maxAcc} m, ${s.info.fixes} Messungen in Folge`);

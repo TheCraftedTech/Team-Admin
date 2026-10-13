@@ -82,17 +82,23 @@
     /* ---------- Seiten (Module „info“, „password“, „end“) ---------- */
     .scroller { position: fixed; inset: 0; z-index: 20; background: var(--bg); overflow-y: auto; -webkit-overflow-scrolling: touch; user-select: text; -webkit-user-select: text; }
     .page { max-width: 560px; margin: 0 auto; padding: calc(env(safe-area-inset-top) + 22px) 18px calc(env(safe-area-inset-bottom) + 28px); display: flex; flex-direction: column; gap: 22px; }
-    .page h1 { font-size: 22px; letter-spacing: 2px; text-shadow: 0 0 12px rgba(0, 255, 102, 0.6); }
-    .page p { color: #cfe9dd; font-size: 15px; line-height: 1.6; white-space: pre-line; }
-    .block { display: flex; flex-direction: column; gap: 10px; }
-    .ph, .block img, .page > img {
-      width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; object-fit: cover;
-      border: 1px dashed var(--muted); color: var(--muted);
-      display: flex; align-items: center; justify-content: center; text-align: center;
-      font-size: 13px; letter-spacing: 2px;
-      background: repeating-linear-gradient(45deg, rgba(0, 255, 102, 0.04) 0 10px, transparent 10px 20px);
-    }
-    .block img, .page > img { border-style: solid; border-color: var(--green); }
+
+    /* ---------- Markdown-Inhalte (content/*.md) ---------- */
+    .md { color: #cfe9dd; font-size: 15px; line-height: 1.6; display: flex; flex-direction: column; gap: 16px; }
+    .md.loading { color: var(--muted); letter-spacing: 2px; }
+    .md.error { color: var(--red); }
+    .md h1 { font-size: 22px; letter-spacing: 2px; color: var(--green); text-shadow: 0 0 12px rgba(0, 255, 102, 0.6); }
+    .md h2 { font-size: 18px; letter-spacing: 1px; color: var(--cyan); }
+    .md h3, .md h4 { font-size: 15px; color: var(--cyan); }
+    .md strong { color: #fff; }
+    .md em { color: var(--cyan); font-style: italic; }
+    .md a { color: var(--cyan); }
+    .md img { display: block; width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--green); }
+    .md ul, .md ol { padding-left: 1.4em; display: flex; flex-direction: column; gap: 6px; }
+    .md blockquote { padding: 10px 14px; border-left: 3px solid var(--cyan); background: rgba(0, 240, 255, 0.06); }
+    .md code { font-family: inherit; background: rgba(0, 255, 102, 0.1); padding: 1px 5px; border-radius: 4px; }
+    .md pre { overflow-x: auto; padding: 10px; border: 1px solid var(--muted); border-radius: 8px; }
+    .md hr { border: 0; border-top: 1px solid var(--muted); }
 
     /* ---------- Modul „password“ ---------- */
     form { display: flex; flex-direction: column; gap: 12px; }
@@ -111,8 +117,8 @@
 
     /* ---------- Modul „end“ ---------- */
     .end .page { text-align: center; min-height: 100%; justify-content: center; }
-    .end h2 { font-size: clamp(28px, 9vw, 44px); letter-spacing: 5px; animation: glow 2s ease-in-out infinite alternate; }
-    .end .sub { color: var(--cyan); letter-spacing: 3px; font-size: 13px; }
+    .end .md h1 { font-size: clamp(28px, 9vw, 44px); letter-spacing: 5px; animation: glow 2s ease-in-out infinite alternate; }
+    .end .md strong { color: var(--cyan); letter-spacing: 3px; font-size: 13px; }
     @keyframes glow { to { text-shadow: 0 0 22px var(--green), 0 0 44px var(--cyan); } }
   </style>
 </head>
@@ -120,6 +126,7 @@
   <div id="view"></div>
 
   <script src="steps.js"></script>
+  <script src="markdown.js"></script>
   <script src="core.js"></script>
   <script src="modules.js"></script>
   <script>startApp();</script>

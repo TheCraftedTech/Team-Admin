@@ -3,14 +3,22 @@
    --------------------------------------------------------------------------
    Das Spiel besteht aus Schritten (STEPS). Jeder Schritt benutzt ein Modul (type):
 
-     info      Text-/Bildseite zum Durchlesen.   Felder: heading, sections[{image, caption, text}], button
+     info      Text-/Bildseite zum Durchlesen.   Felder: md, button
      locate    Ortungs-Radar zu einem Ort.       Felder: lat, lng, radius, maxAccuracy, fixes
                (ein Ort = ein Schritt; „WEITER“ erscheint erst am Ort)
-     password  Eingabefeld für ein Passwort.     Felder: heading, image, caption, text, placeholder, answers[], button
-     end       Abschlussseite.                   Felder: heading, subtitle, image, caption, text
+     password  Eingabefeld für ein Passwort.     Felder: md (Text darüber), placeholder, answers[], button
+     end       Abschlussseite.                   Felder: md
 
    Gemeinsame Felder: id (eindeutig, unter ihr wird der Fortschritt gespeichert) und
    title (nur für die Debug-Seite).
+
+   TEXTE UND BILDER (Markdown): md ist die ID einer Datei im Ordner content/, z. B. md: "8861a3f4"
+   lädt content/8861a3f4.md. Bilder liegen im selben Ordner, ebenfalls mit Hash als Namen, und
+   werden im Markdown nur mit dem Dateinamen eingebunden:  ![Beschreibung](769642ab.png)
+   Hash-Namen anlegen:  node tools/hashify.js bild.png text.md   (kopiert die Dateien nach content/)
+   oder einen neuen Text mit festem Namen:  node tools/hashify.js --neu
+   Achtung: Wer die Seite im Browser untersucht, kann alle Dateien in content/ abrufen – Hash-Namen
+   verhindern nur das Erraten, keine Einsicht in steps.js.
 
    Neuen Schritt einbauen: ein Objekt an der gewünschten Stelle in STEPS einfügen.
    Das Modul „password“ ist fertig, wird aber noch von keinem Schritt benutzt: Sobald die Passwörter
@@ -30,18 +38,7 @@ const SETTINGS = {
 };
 
 const STEPS = [
-  {
-    id: "einfuehrung",
-    type: "info",
-    title: "Einführung (Story)",
-    heading: "INFORMATIONEN",
-    sections: [
-      { image: "", caption: "BILD-PLATZHALTER 1", text: "Platzhaltertext: Hier steht die Einführung in die Geschichte. Worum geht es, wer sind die Figuren, was ist passiert?" },
-      { image: "", caption: "BILD-PLATZHALTER 2", text: "Platzhaltertext: Spielregeln und Hinweise.\n• Bleibt zusammen.\n• Achtet auf den Straßenverkehr.\n• Der Story-Guide führt euch durch das Spiel." },
-      { image: "", caption: "BILD-PLATZHALTER 3", text: "Platzhaltertext: Wenn ihr bereit seid, tippt unten auf „Fertig“." }
-    ],
-    button: "FERTIG"
-  },
+  { id: "einfuehrung", type: "info", title: "Einführung (Story)", md: "8861a3f4", button: "FERTIG" },
 
   /* Ort 1 ist der Start (Turm VI, 47.758796076746 / 8.83948384873872): Dort findet die Einführung statt,
      deshalb gibt es dafür keinen eigenen Ortungs-Schritt. Die Orte 2 bis 7 folgen der Reihe nach. */
@@ -52,14 +49,5 @@ const STEPS = [
   { id: "ort6", type: "locate", title: "Ort 6", lat: 47.76170564732148,  lng: 8.842634771566102 },
   { id: "ort7", type: "locate", title: "Ort 7 (Ziel: Marktweiber)", lat: 47.76225845637471, lng: 8.842851679977652 },
 
-  {
-    id: "ende",
-    type: "end",
-    title: "Ende",
-    heading: "ZIEL ERREICHT",
-    subtitle: "DIE ERDE IST GERETTET",
-    image: "",
-    caption: "BILD-PLATZHALTER",
-    text: "Platzhaltertext: Glückwunsch, ihr habt alle Orte gefunden! Hier steht der Abschluss der Geschichte und wie es weitergeht (Treffpunkt, Auswertung, Preise …)."
-  }
+  { id: "ende", type: "end", title: "Ende", md: "0845e9c6" }
 ];
