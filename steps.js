@@ -13,6 +13,9 @@
    title (nur für die Debug-Seite).
 
    Neuen Schritt einbauen: ein Objekt an der gewünschten Stelle in STEPS einfügen.
+   Das Modul „password“ ist fertig, wird aber noch von keinem Schritt benutzt: Sobald die Passwörter
+   des Story-Guides feststehen, kommt dort, wo sie gebraucht werden, ein Schritt mit type: "password"
+   und answers: [ … ] hinein.
    Neues Modul bauen: in modules.js mit registerModule("name", (ctx) => …) anlegen und
    hier mit type: "name" benutzen.
 
@@ -40,21 +43,8 @@ const STEPS = [
     button: "FERTIG"
   },
 
-  { id: "ort1", type: "locate", title: "Ort 1 (Start)", lat: 47.758796076746,    lng: 8.83948384873872 },
-
-  {
-    id: "wort1",
-    type: "password",
-    title: "Story-Guide: Passwort 1",
-    heading: "STORY-GUIDE",
-    image: "",
-    caption: "BILD-PLATZHALTER",
-    text: "Platzhaltertext: Hier fragt der Story-Guide nach dem ersten Passwort. Gebt das Codewort aus dem Heft ein.",
-    placeholder: "PASSWORT",
-    answers: ["platzhalter"],
-    button: "PRÜFEN"
-  },
-
+  /* Ort 1 ist der Start (Turm VI, 47.758796076746 / 8.83948384873872): Dort findet die Einführung statt,
+     deshalb gibt es dafür keinen eigenen Ortungs-Schritt. Die Orte 2 bis 7 folgen der Reihe nach. */
   { id: "ort2", type: "locate", title: "Ort 2", lat: 47.759442881868516, lng: 8.8405967427222 },
   { id: "ort3", type: "locate", title: "Ort 3", lat: 47.760105831192874, lng: 8.839979882181922 },
   { id: "ort4", type: "locate", title: "Ort 4", lat: 47.76058112053592,  lng: 8.841501782310322 },
