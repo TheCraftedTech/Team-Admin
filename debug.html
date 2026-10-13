@@ -29,12 +29,18 @@
     button:active { background: rgba(0, 255, 102, 0.15); }
     button.danger { color: var(--amber); border-color: var(--amber); }
     label { display: inline-flex; align-items: center; gap: 6px; color: #d6efe3; }
-    input[type="number"], select { font: inherit; width: 72px; background: #0a0f0d; color: var(--green); border: 1px solid var(--line); border-radius: 4px; padding: 5px; }
-    select { width: auto; }
+    input[type="number"] { font: inherit; width: 72px; background: #0a0f0d; color: var(--green); border: 1px solid var(--line); border-radius: 4px; padding: 5px; }
     input[type="range"] { flex: 1; min-width: 120px; accent-color: var(--green); }
 
+    .steps { display: flex; flex-direction: column; gap: 4px; }
+    .steps button { text-align: left; display: flex; gap: 8px; border-color: var(--line); color: #d6efe3; }
+    .steps button .no { color: var(--muted); min-width: 1.6em; }
+    .steps button .ty { color: var(--cyan); min-width: 6.5em; }
+    .steps button.now { border-color: var(--green); background: rgba(0, 255, 102, 0.12); color: var(--green); }
+    .steps button.done .no::after { content: " ✔"; color: var(--green); }
+
     pre { white-space: pre-wrap; line-height: 1.55; color: #d6efe3; }
-    #log { max-height: 160px; overflow-y: auto; color: var(--muted); font-size: 12px; }
+    #log { max-height: 150px; overflow-y: auto; color: var(--muted); font-size: 12px; }
     .err { color: var(--red); }
     .hint { color: var(--muted); font-size: 12px; line-height: 1.5; }
   </style>
@@ -55,16 +61,26 @@
       </section>
 
       <section>
-        <h2>Spielablauf (mit den normalen Regeln)</h2>
+        <h2>Schritte (zum Wechseln antippen)</h2>
+        <div class="steps" id="steps"></div>
         <div class="row">
-          <button type="button" id="intro">Info-Seite: „FERTIG“</button>
-          <button type="button" id="next">„WEITER“ drücken</button>
+          <button type="button" id="prev">‹ Schritt zurück</button>
+          <button type="button" id="fwd">Schritt vor ›</button>
         </div>
-        <p class="hint" style="margin-top:8px">„WEITER“ klappt wie im Spiel nur, wenn der Button sichtbar ist, also erst am Ort.</p>
+        <p class="hint" style="margin-top:8px">Das umgeht die Spielregeln – nur zum Testen. Der Fortschritt wird wie im Spiel gespeichert.</p>
       </section>
 
       <section>
-        <h2>Fake-GPS (überschreibt das echte GPS)</h2>
+        <h2>Normaler Ablauf (mit den Spielregeln)</h2>
+        <div class="row">
+          <button type="button" id="main">Haupt-Button drücken</button>
+          <label><input type="checkbox" id="auto"> Automatisch durchspielen</label>
+        </div>
+        <p class="hint" style="margin-top:8px">Der Haupt-Button des Schritts (FERTIG, PRÜFEN, WEITER) lässt sich nur drücken, wenn er im Spiel sichtbar ist. Beim Automatik-Lauf trägt die Seite Passwörter selbst ein und läuft mit Fake-GPS zu den Orten.</p>
+      </section>
+
+      <section data-for="locate" hidden>
+        <h2>Ort: Fake-GPS (überschreibt das echte GPS)</h2>
         <div class="row">
           <button type="button" id="tp">Zum Ort teleportieren</button>
           <button type="button" id="far">100 m davor</button>
@@ -73,33 +89,27 @@
         <div class="row">
           <label>Schritt <input type="number" id="stepM" value="12" min="1" max="200"> m</label>
           <label>Genauigkeit <input type="number" id="acc" value="8" min="1" max="500"> m</label>
-        </div>
-        <div class="row">
-          <label><input type="checkbox" id="auto"> Auto-Walk</label>
-          <label><input type="checkbox" id="autoNext"> Auto-WEITER</label>
           <button type="button" id="real">Echtes GPS</button>
         </div>
-        <p class="hint" style="margin-top:8px">Auto-Walk läuft zum aktuellen Ort, die Ankunft prüft das Spiel selbst (Radius/Genauigkeit). Mit Auto-WEITER läuft es bis zum Ziel durch.</p>
-      </section>
-
-      <section>
-        <h2>Fake-Kompass</h2>
         <div class="row">
-          <label><input type="checkbox" id="compass"> an</label>
+          <label><input type="checkbox" id="compass"> Fake-Kompass</label>
           <input type="range" id="heading" min="0" max="359" value="0">
           <span id="headingVal">0°</span>
         </div>
       </section>
 
-      <section class="warn">
-        <h2>Springen – umgeht die Spielregeln (nur Debug)</h2>
+      <section data-for="password" hidden>
+        <h2>Passwort</h2>
         <div class="row">
-          <button type="button" id="prev" class="danger">‹ Ort zurück</button>
-          <button type="button" id="skip" class="danger">Ort überspringen ›</button>
+          <button type="button" id="fillRight">Richtiges Passwort eintragen</button>
+          <button type="button" id="fillWrong">Falsches testen</button>
         </div>
+        <p class="hint" style="margin-top:8px" id="answers"></p>
+      </section>
+
+      <section class="warn">
+        <h2>Spielstand</h2>
         <div class="row">
-          <label>Gehe zu <select id="jump"></select></label>
-          <button type="button" id="jumpGo" class="danger">Springen</button>
           <button type="button" id="reset" class="danger">Alles zurücksetzen</button>
         </div>
       </section>
@@ -118,7 +128,8 @@
      debug.html – zeigt die index.html in einem Iframe (kein doppelter Code) und steuert sie
      von außen. Das geht, weil beide Seiten denselben Ursprung haben (über https:// oder
      http://localhost öffnen – als Datei (file://) verbietet der Browser den Zugriff).
-     Die Spiellogik bleibt in index.html; hier werden nur deren Funktionen aufgerufen.
+     Die Schritte und ihre Reihenfolge kommen aus steps.js des Spiels; hier wird nichts nachgebaut.
+     Neue Module funktionieren hier sofort mit Schrittliste, Zurück/Vor und Haupt-Button.
      ====================================================================== */
 
   const $ = (id) => document.getElementById(id);
@@ -130,7 +141,7 @@
     try {
       const w = frame.contentWindow;
       void w.document;                      // wirft bei fremdem Ursprung
-      return typeof w.onPosition === "function" ? w : null;
+      return typeof w.goTo === "function" && w.document.getElementById("view") ? w : null;
     } catch (e) { return null; }
   }
   /** Code im Kontext des Spiels ausführen (kommt auch an dessen let/const heran) */
@@ -138,6 +149,16 @@
     const w = gameWindow();
     if (!w) throw new Error("Spiel nicht bereit");
     return w.eval(code);
+  }
+  /** Zustand des Spiels als einfaches Objekt */
+  function snapshot() {
+    return JSON.parse(ev("JSON.stringify({" +
+      "index: state.index, total: STEPS.length," +
+      "steps: STEPS.map((s) => ({ id: s.id, type: s.type, title: s.title || s.id }))," +
+      "step: STEPS[state.index]," +
+      "info: current && current.instance && current.instance.info ? current.instance.info() : null," +
+      "pos: pos ? { acc: pos.acc, age: (Date.now() - pos.t) / 1000 } : null," +
+      "heading: heading })"));
   }
 
   function log(msg, isError) {
@@ -148,31 +169,41 @@
     el.prepend(line);
     while (el.childElementCount > 60) el.lastChild.remove();
   }
-
-  /** Führt eine Aktion aus und meldet Fehler im Protokoll */
   function act(name, fn) {
     try { fn(); } catch (e) { log(`${name}: ${e.message}`, true); }
   }
 
-  /* ---------- Geometrie ---------- */
+  /* ---------- Schritte wechseln ---------- */
+  function goTo(i) {
+    const s = snapshot();
+    const index = Math.min(Math.max(i, 0), s.total - 1);
+    ev(`goTo(${index})`);
+    log(`Schritt ${index + 1} „${s.steps[index].title}“ (${s.steps[index].type}).`);
+  }
+  $("prev").addEventListener("click", () => act("Zurück", () => goTo(snapshot().index - 1)));
+  $("fwd").addEventListener("click", () => act("Vor", () => goTo(snapshot().index + 1)));
+
+  /* ---------- Haupt-Button (normaler Ablauf) ---------- */
+  function mainButton() {
+    return [...gameWindow().document.querySelectorAll("#view .go")].find((b) => !b.hidden && !b.disabled) || null;
+  }
+  function pressMain() {
+    const b = mainButton();
+    if (!b) throw new Error("Es gibt gerade keinen drückbaren Haupt-Button (bei „Ort“: erst am Ort).");
+    b.click();
+    log(`Gedrückt: „${b.textContent.trim()}“.`);
+  }
+  $("main").addEventListener("click", () => act("Haupt-Button", pressMain));
+
+  /* ---------- Geometrie & Fake-GPS ---------- */
   const mToLat = (m) => m / M_PER_DEG;
-  const mToLng = (m, lat) => m / (M_PER_DEG * Math.cos((lat * Math.PI) / 180));
   function distM(a, b) {
     const dy = (b.lat - a.lat) * M_PER_DEG;
     const dx = (b.lng - a.lng) * M_PER_DEG * Math.cos((a.lat * Math.PI) / 180);
     return Math.hypot(dx, dy);
   }
 
-  function snapshot() {
-    return ev("({ intro: state.introDone, index: state.index, arrived: state.arrived, finished: finished(), total: WAYPOINTS.length, " +
-              "target: finished() ? null : { lat: WAYPOINTS[state.index].lat, lng: WAYPOINTS[state.index].lng }, " +
-              "pos: pos ? { acc: pos.acc, dist: pos.dist === undefined ? null : pos.dist, age: (Date.now() - pos.t) / 1000 } : null, " +
-              "heading: heading, radius: REACH_RADIUS, maxAcc: MAX_ACCURACY })");
-  }
-
-  /* ---------- Fake-GPS ---------- */
   const fake = { active: false, lat: 0, lng: 0 };
-
   function sendFix() {
     const w = gameWindow();
     if (!w || !fake.active) return;
@@ -182,7 +213,6 @@
     fake.active = true; fake.lat = lat; fake.lng = lng;
     sendFix(); sendFix();                    // zwei Messungen: so viele braucht das Spiel für die Ankunft
   }
-
   // Frische Fake-Messung, solange aktiv (sonst würde ein echtes GPS-Signal dazwischenfunken)
   setInterval(() => { try { sendFix(); } catch (e) { /* Spiel lädt gerade */ } }, 1000);
 
@@ -192,79 +222,76 @@
     const k = Math.min(meters, d) / d;
     setFake(fake.lat + (t.lat - fake.lat) * k, fake.lng + (t.lng - fake.lng) * k);
   }
+  function locateStep() {
+    const s = snapshot();
+    if (s.step.type !== "locate") throw new Error("Der aktuelle Schritt ist kein Ort.");
+    return s.step;
+  }
 
   $("tp").addEventListener("click", () => act("Teleport", () => {
-    const s = snapshot();
-    if (!s.target) throw new Error("Schon am Ende");
-    setFake(s.target.lat, s.target.lng);
-    log(`Fake-GPS direkt am Ort ${s.index + 1}.`);
+    const t = locateStep();
+    setFake(t.lat, t.lng);
+    log("Fake-GPS direkt am Ort.");
   }));
   $("far").addEventListener("click", () => act("100 m davor", () => {
-    const s = snapshot();
-    if (!s.target) throw new Error("Schon am Ende");
-    setFake(s.target.lat - mToLat(100), s.target.lng);
-    log(`Fake-GPS 100 m südlich von Ort ${s.index + 1}.`);
+    const t = locateStep();
+    setFake(t.lat - mToLat(100), t.lng);
+    log("Fake-GPS 100 m südlich vom Ort.");
   }));
   $("step").addEventListener("click", () => act("Schritt", () => {
-    const s = snapshot();
-    if (!s.target) throw new Error("Schon am Ende");
-    if (!fake.active) setFake(s.target.lat - mToLat(100), s.target.lng);
-    stepToward(s.target, Number($("stepM").value) || 12);
+    const t = locateStep();
+    if (!fake.active) setFake(t.lat - mToLat(100), t.lng);
+    stepToward(t, Number($("stepM").value) || 12);
   }));
-  $("real").addEventListener("click", () => { fake.active = false; $("auto").checked = false; log("Echtes GPS wird wieder genutzt."); });
+  $("real").addEventListener("click", () => { fake.active = false; log("Echtes GPS wird wieder genutzt."); });
 
-  /* ---------- Spielablauf ---------- */
-  function pressIntro() {
-    const b = gameWindow().document.querySelector("#intro button");
-    if (!b || gameWindow().document.getElementById("intro").hidden) throw new Error("Die Info-Seite ist schon geschlossen");
-    b.click();
-    log("Info-Seite mit „FERTIG“ geschlossen.");
-  }
-  function pressNext() {
-    const b = gameWindow().document.getElementById("next");
-    if (b.hidden) throw new Error("„WEITER“ ist noch nicht sichtbar – erst am Ort (innerhalb des Radius).");
-    b.click();
-    log("„WEITER“ gedrückt.");
-  }
-  $("intro").addEventListener("click", () => act("Info", pressIntro));
-  $("next").addEventListener("click", () => act("WEITER", pressNext));
-
-  /* ---------- Auto-Walk ---------- */
-  setInterval(() => {
-    if (!$("auto").checked) return;
-    try {
-      const s = snapshot();
-      if (!s.intro) { pressIntro(); return; }
-      if (s.finished) { $("auto").checked = false; log("Ziel erreicht – Auto-Walk beendet."); return; }
-      if (s.arrived) { if ($("autoNext").checked) { pressNext(); } return; }
-      if (!fake.active) setFake(s.target.lat - mToLat(150), s.target.lng);
-      stepToward(s.target, Number($("stepM").value) || 12);
-    } catch (e) { /* Spiel lädt gerade */ }
-  }, 400);
-
-  /* ---------- Fake-Kompass ---------- */
   $("heading").addEventListener("input", () => { $("headingVal").textContent = `${$("heading").value}°`; });
   setInterval(() => {
     if (!$("compass").checked) return;
     try { ev(`setSensorHeading(${Number($("heading").value)})`); } catch (e) { /* Spiel lädt gerade */ }
   }, 100);
 
-  /* ---------- Springen (Debug-Notausgang, umgeht die Regeln) ---------- */
-  function jumpTo(index) {
-    ev(`state.introDone = true; state.index = ${index}; state.arrived = false; insideCount = 0; saveState(); syncUI(); refresh();`);
-    log(index >= Number(ev("WAYPOINTS.length")) ? "Zum Ende gesprungen." : `Zu Ort ${index + 1} gesprungen.`);
+  /* ---------- Passwort ---------- */
+  function fillPassword(text) {
+    const doc = gameWindow().document;
+    const input = doc.querySelector("#view input.field");
+    const form = doc.querySelector("#view form");
+    if (!input || !form) throw new Error("Der aktuelle Schritt hat kein Passwort-Feld.");
+    input.value = text;
+    form.requestSubmit();
   }
-  $("skip").addEventListener("click", () => act("Überspringen", () => {
-    const s = snapshot();
-    if (s.finished) throw new Error("Schon am Ende");
-    ev("state.introDone = true; state.arrived = true; advance();");
-    log(`Ort ${s.index + 1} übersprungen (Debug).`);
+  $("fillRight").addEventListener("click", () => act("Passwort", () => {
+    const answers = snapshot().step.answers || [];
+    if (!answers.length) throw new Error("Für diesen Schritt ist kein Passwort hinterlegt.");
+    fillPassword(answers[0]);
+    log(`Passwort „${answers[0]}“ eingetragen.`);
   }));
-  $("prev").addEventListener("click", () => act("Zurück", () => {
-    const s = snapshot();
-    jumpTo(Math.max(0, s.index - 1));
-  }));
-  $("jumpGo").addEventListener("click", () => act("Springen", () => jumpTo(Number($("jump").value))));
+  $("fillWrong").addEventListener("click", () => act("Passwort", () => { fillPassword("falsch-" + Date.now() % 1000); log("Falsches Passwort eingetragen."); }));
+
+  /* ---------- Automatisch durchspielen (jeder Schritt mit seinen normalen Regeln) ---------- */
+  let lastAutoIndex = -1, autoWait = 0;
+  setInterval(() => {
+    if (!$("auto").checked) return;
+    try {
+      const s = snapshot();
+      const t = s.step.type;
+      if (t === "end") { $("auto").checked = false; log("Ende erreicht – Automatik beendet."); return; }
+      if (s.index !== lastAutoIndex) { lastAutoIndex = s.index; autoWait = 0; }
+
+      if (t === "locate") {
+        if (s.info && s.info.arrived) { if (mainButton()) pressMain(); return; }
+        if (!fake.active) setFake(s.step.lat - mToLat(150), s.step.lng);
+        stepToward(s.step, Number($("stepM").value) || 12);
+      } else if (t === "password") {
+        if (autoWait === 0) { fillPassword((s.step.answers || [""])[0]); autoWait = 1; }
+      } else if (autoWait === 0 && mainButton()) {
+        pressMain();
+        autoWait = 1;
+      }
+    } catch (e) { /* Spiel lädt gerade */ }
+  }, 450);
+
+  /* ---------- Zurücksetzen ---------- */
   $("reset").addEventListener("click", () => act("Reset", () => {
     fake.active = false;
     $("auto").checked = false;
@@ -273,40 +300,57 @@
     log("Spielstand gelöscht, Spiel neu geladen.");
   }));
 
-  /* ---------- Statusanzeige ---------- */
+  /* ---------- Anzeige ---------- */
+  let renderedIndex = -1, renderedTotal = -1;
+
+  function renderSteps(s) {
+    const box = $("steps");
+    box.replaceChildren(...s.steps.map((st, i) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = i === s.index ? "now" : i < s.index ? "done" : "";
+      const no = document.createElement("span"); no.className = "no"; no.textContent = String(i + 1);
+      const ty = document.createElement("span"); ty.className = "ty"; ty.textContent = st.type;
+      const ti = document.createElement("span"); ti.textContent = st.title;
+      b.append(no, ty, ti);
+      b.addEventListener("click", () => act("Wechsel", () => goTo(i)));
+      return b;
+    }));
+  }
+
   function renderStatus() {
     const box = $("status"), problem = $("problem");
     let s;
     try { s = snapshot(); } catch (e) {
-      const blocked = !gameWindow() && frame.contentDocument === null;
       box.textContent = "Spiel nicht erreichbar.";
       problem.hidden = false;
       problem.className = "hint err";
-      problem.textContent = blocked || location.protocol === "file:"
+      problem.textContent = location.protocol === "file:"
         ? "Zugriff blockiert: Bitte debug.html über https:// (z. B. GitHub Pages) oder http://localhost öffnen, nicht als Datei."
         : "Das Spiel lädt noch …";
       return;
     }
     problem.hidden = true;
 
-    if (!$("jump").options.length) {
-      for (let i = 0; i < s.total; i++) $("jump").add(new Option(`Ort ${i + 1}`, i));
-      $("jump").add(new Option("Ende (Ziel)", s.total));
+    if (s.index !== renderedIndex || s.total !== renderedTotal) {
+      renderSteps(s);
+      renderedIndex = s.index; renderedTotal = s.total;
     }
+    document.querySelectorAll("[data-for]").forEach((sec) => { sec.hidden = sec.dataset.for !== s.step.type; });
+    if (s.step.type === "password") $("answers").textContent = `Richtig: ${(s.step.answers || []).join(", ")}`;
 
-    const lines = [];
-    lines.push(`Info-Seite: ${s.intro ? "gelesen" : "noch offen"}`);
-    lines.push(s.finished ? "Ort: ALLE erreicht (Ende)" : `Ort: ${s.index + 1} / ${s.total}   Angekommen: ${s.arrived ? "JA (WEITER sichtbar)" : "nein"}`);
-    lines.push(s.pos
-      ? `Entfernung: ${s.pos.dist === null ? "–" : Math.round(s.pos.dist) + " m"}   GPS ±${Math.round(s.pos.acc)} m   (${fake.active ? "FAKE" : "echt"}, vor ${Math.round(s.pos.age)} s)`
-      : "Position: noch keine");
-    lines.push(`Regel: Radius ${s.radius} m, Genauigkeit ≤ ${s.maxAcc} m, 2 Messungen in Folge`);
-    lines.push(`Kompass: ${s.heading === null ? "–" : Math.round(s.heading) + "°"}`);
+    const lines = [`Schritt ${s.index + 1} / ${s.total}: ${s.step.title || s.step.id}  [${s.step.type}]`];
+    if (s.step.type === "locate" && s.info) {
+      lines.push(`Entfernung: ${s.info.dist === null ? "–" : Math.round(s.info.dist) + " m"}   Angekommen: ${s.info.arrived ? "JA (WEITER sichtbar)" : "nein"}`);
+      lines.push(`Regel: Radius ${s.info.radius} m, Genauigkeit ≤ ${s.info.maxAcc} m, ${s.info.fixes} Messungen in Folge`);
+      lines.push(s.pos ? `GPS ±${Math.round(s.pos.acc)} m (${fake.active ? "FAKE" : "echt"}, vor ${Math.round(s.pos.age)} s)` : "GPS: noch keine Position");
+      lines.push(`Kompass: ${s.heading === null ? "–" : Math.round(s.heading) + "°"}`);
+    }
     box.textContent = lines.join("\n");
   }
   setInterval(renderStatus, 500);
 
-  frame.addEventListener("load", () => log("Spiel geladen."));
+  frame.addEventListener("load", () => { renderedIndex = -1; log("Spiel geladen."); });
   </script>
 </body>
 </html>
