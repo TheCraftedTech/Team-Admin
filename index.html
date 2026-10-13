@@ -2,13 +2,13 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <title>Alien-Radar</title>
+  <title>Radar</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#030307">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Alien-Radar">
+  <meta name="apple-mobile-web-app-title" content="Radar">
 
   <style>
     :root {
@@ -63,40 +63,6 @@
     .note { margin-top: 8px; min-height: 1.3em; font-size: 12px; letter-spacing: 1px; color: var(--muted); }
     .note.err { color: var(--red); }
 
-    .wake { position: fixed; top: calc(env(safe-area-inset-top) + 10px); right: 14px; font-size: 12px; color: var(--muted); z-index: 3; }
-    .wake.on { color: var(--green); opacity: 0.7; }
-    .wake.bad { color: var(--red); }
-
-    /* ---------- Start-Screen ---------- */
-    .start {
-      position: fixed; inset: 0; z-index: 10;
-      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px;
-      padding: 24px; text-align: center;
-      background:
-        radial-gradient(circle at 50% 40%, rgba(0, 255, 102, 0.10), transparent 60%),
-        var(--bg);
-    }
-    .start-radar { position: relative; width: min(56vw, 240px); aspect-ratio: 1; border-radius: 50%; border: 2px solid var(--green); box-shadow: 0 0 24px rgba(0, 255, 102, 0.45), inset 0 0 30px rgba(0, 255, 102, 0.2); overflow: hidden; }
-    .start-radar::before { content: ""; position: absolute; inset: 0; background: repeating-radial-gradient(circle, transparent 0 28px, rgba(0, 255, 102, 0.28) 28px 29px); }
-    .start-radar::after { content: ""; position: absolute; inset: 0; background: conic-gradient(from 0deg, rgba(0, 255, 102, 0.55), rgba(0, 255, 102, 0) 22%, transparent); animation: spin 3s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .start h1 { font-size: clamp(22px, 7vw, 30px); letter-spacing: 5px; text-shadow: 0 0 14px rgba(0, 255, 102, 0.7); }
-    .start h1 span { color: var(--cyan); }
-    .start p { max-width: 30ch; font-size: 13px; line-height: 1.5; color: var(--muted); letter-spacing: 0.5px; }
-    .start-btn {
-      width: min(100%, 340px);
-      font: inherit; font-size: 15px; font-weight: bold; letter-spacing: 2px;
-      color: var(--green); background: rgba(0, 255, 102, 0.1);
-      border: 1px solid var(--green); border-radius: 10px;
-      padding: 18px 12px; cursor: pointer;
-      box-shadow: 0 0 18px rgba(0, 255, 102, 0.35);
-      animation: breathe 2.2s ease-in-out infinite;
-    }
-    .start-btn:active { transform: scale(0.97); }
-    .start-btn:disabled { opacity: 0.5; animation: none; }
-    @keyframes breathe { 50% { box-shadow: 0 0 30px rgba(0, 255, 102, 0.65); } }
-    .start-msg { min-height: 2.8em; color: var(--red); font-size: 13px; }
-
     /* ---------- Ziel erreicht ---------- */
     .end {
       position: fixed; inset: 0; z-index: 8;
@@ -122,17 +88,6 @@
     <div class="dist" id="dist">ENTFERNUNG: – – –</div>
     <div class="note" id="note"></div>
   </footer>
-
-  <span class="wake" id="wake" title="Display-Sperre">○</span>
-
-  <!-- Start- & Berechtigungs-Screen -->
-  <section class="start" id="start">
-    <div class="start-radar" aria-hidden="true"></div>
-    <h1>ALIEN<span>//</span>RADAR</h1>
-    <p>Ortung und Kompass werden benötigt. Bitte im nächsten Schritt alle Anfragen erlauben.</p>
-    <button class="start-btn" id="startBtn" type="button">SYSTEM STARTEN / GPS AKTIVIEREN</button>
-    <div class="start-msg" id="startMsg" role="alert"></div>
-  </section>
 
   <section class="end" id="end" hidden>
     <h2>ZIEL ERREICHT</h2>
@@ -207,23 +162,14 @@
      Wake Lock – Display bleibt an
      ====================================================================== */
   let wakeLock = null, wakePending = false;
-  function setWake(state, title) {
-    const el = $("wake");
-    el.className = `wake ${state}`;
-    el.textContent = state === "on" ? "◉" : state === "bad" ? "⚠" : "○";
-    el.title = title;
-  }
   async function requestWake() {
-    if (!("wakeLock" in navigator)) { setWake("bad", "Display-Sperre nicht unterstützt – Display-Timeout am Handy verlängern!"); return; }
+    if (!("wakeLock" in navigator)) return;
     if (wakePending || (wakeLock && !wakeLock.released)) return;
     wakePending = true;
     try {
       wakeLock = await navigator.wakeLock.request("screen");
-      wakeLock.addEventListener("release", () => setWake("", "Display-Sperre inaktiv"));
-      setWake("on", "Display-Sperre aktiv");
-    } catch (e) {
-      setWake("", "Display-Sperre inaktiv – tippen zum Aktivieren");
-    } finally { wakePending = false; }
+    } catch (e) { /* wird bei der nächsten Berührung erneut versucht */ }
+    finally { wakePending = false; }
   }
   requestWake();
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") requestWake(); });
@@ -328,14 +274,17 @@
   const iosNeedsPermission =
     typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function";
 
-  /** Muss bei iOS direkt aus dem Button-Klick aufgerufen werden */
-  async function enableOrientation() {
-    if (!iosNeedsPermission) { listenOrientation(); return; }
+  /* Die Berechtigungen werden einmalig in init.html erteilt. Hier werden die Sensoren nur noch
+     angezapft. iOS fragt die Kompass-Freigabe pro Browser-Sitzung neu ab: Wurde sie in init.html
+     erteilt, liefern die Events sofort Werte. Sonst versuchen wir es still bei der ersten
+     Berührung des Displays (es gibt dafür keinen sichtbaren Button). */
+  function silentOrientationRequest() {
+    if (!iosNeedsPermission) return;
     try {
       if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
         DeviceMotionEvent.requestPermission().catch(() => {});
       }
-      if ((await DeviceOrientationEvent.requestPermission()) === "granted") listenOrientation();
+      DeviceOrientationEvent.requestPermission().then(() => {}, () => {});
     } catch (e) { /* ohne Kompass weiter (GPS-Richtung als Reserve) */ }
   }
 
@@ -353,7 +302,7 @@
 
   function startTracking() {
     if (watchId !== null) return;
-    if (!navigator.geolocation) { showStart("Dieses Gerät unterstützt keine Ortung."); return; }
+    if (!navigator.geolocation) { setNote("DIESES GERÄT UNTERSTÜTZT KEINE ORTUNG", true); return; }
     setNote("SUCHE GPS-SIGNAL …");
     watchId = navigator.geolocation.watchPosition(onPosition, onPositionError, {
       enableHighAccuracy: true, maximumAge: 0, timeout: 20000
@@ -365,7 +314,6 @@
   }
 
   function onPosition(p) {
-    dismissStart();
     pos = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy };
     // Bewegungsrichtung laut GPS (nur beim Gehen verlässlich) – Reserve, falls kein Kompass da ist
     const { heading: gh, speed } = p.coords;
@@ -375,13 +323,11 @@
   }
 
   function onPositionError(err) {
-    if (err.code === 1) {                       // Berechtigung verweigert
+    if (err.code === 1) {                       // Berechtigung fehlt → zurück zur Einrichtung
       stopTracking();
-      pos = null;
-      showStart("ORTUNG BLOCKIERT. Bitte in den Browser-Einstellungen für diese Seite „Standort“ erlauben und erneut tippen.");
+      location.replace("init.html");
       return;
     }
-    dismissStart();                             // Berechtigung ist da, nur gerade kein Signal
     setNote(err.code === 2 ? "KEIN GPS-SIGNAL – BITTE INS FREIE GEHEN" : "SUCHE GPS-SIGNAL …");
   }
 
@@ -419,42 +365,21 @@
   setInterval(resolveHeading, 500);   // Quelle wechseln, wenn der Kompass ausfällt
 
   /* ======================================================================
-     Start-Screen
+     Start: ohne Button – Berechtigungen kommen aus init.html
      ====================================================================== */
-  const startEl = $("start"), startBtn = $("startBtn"), startMsg = $("startMsg");
-
-  function showStart(msg) {
-    startEl.hidden = false;
-    startBtn.disabled = false;
-    setText(startMsg, msg || "");
-  }
-  function dismissStart() {
-    if (!startEl.hidden) startEl.hidden = true;
-  }
-
-  startBtn.addEventListener("click", async () => {
-    startBtn.disabled = true;
-    setText(startMsg, "");
-    requestWake();
-    await enableOrientation();      // iOS: Kompass-Abfrage direkt aus dem Klick
-    startTracking();                // löst die Standort-Abfrage des Browsers aus
-    // Falls weder Position noch Fehler kommen, Button nach kurzer Zeit wieder freigeben
-    setTimeout(() => { if (!startEl.hidden) startBtn.disabled = false; }, 8000);
-  });
-
-  async function initPermissions() {
+  async function boot() {
     let geo = "unknown";
     try { geo = (await navigator.permissions.query({ name: "geolocation" })).state; } catch (e) { /* nicht unterstützt */ }
 
-    if (geo === "granted" && !iosNeedsPermission) {
-      // Alles schon erlaubt → direkt los
-      dismissStart();
-      listenOrientation();
-      startTracking();
-    } else if (geo === "denied") {
-      showStart("ORTUNG BLOCKIERT. Bitte in den Browser-Einstellungen für diese Seite „Standort“ erlauben und die Seite neu laden.");
-    }
-    // sonst: Start-Screen bleibt sichtbar, bis der Nutzer tippt
+    // Standort noch nicht erlaubt (oder blockiert) → erst init.html durchlaufen
+    let initDone = false;
+    try { initDone = sessionStorage.getItem("radar.initDone") === "1"; } catch (e) { /* ignorieren */ }
+    if ((geo === "prompt" || geo === "denied") && !initDone) { location.replace("init.html"); return; }
+
+    listenOrientation();
+    silentOrientationRequest();
+    document.addEventListener("click", silentOrientationRequest, { once: true });
+    startTracking();
   }
 
   /* ======================================================================
@@ -575,7 +500,7 @@
      Start
      ====================================================================== */
   if (finished()) { $("end").hidden = false; setText(distEl, "ENTFERNUNG: 0 m"); }
-  initPermissions();
+  boot();
 
   // Test-Hilfe: index.html?debug zeigt einen Button zum Überspringen
   if (new URLSearchParams(location.search).has("debug")) {

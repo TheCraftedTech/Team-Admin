@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Einrichtung</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#030307">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="robots" content="noindex">
+
+  <style>
+    :root { --bg: #030307; --green: #00ff66; --cyan: #00f0ff; --red: #ff3b5c; --amber: #ffb020; --muted: #4f7a68; }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      height: 100%; background: var(--bg); color: var(--green);
+      font-family: "Courier New", ui-monospace, Menlo, Consolas, monospace;
+      overflow: hidden; user-select: none; -webkit-user-select: none;
+    }
+    body {
+      height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px;
+      padding: calc(env(safe-area-inset-top) + 20px) 24px calc(env(safe-area-inset-bottom) + 20px);
+      background: radial-gradient(circle at 50% 35%, rgba(0, 255, 102, 0.10), transparent 60%), var(--bg);
+    }
+    body::after {
+      content: ""; position: fixed; inset: 0; pointer-events: none;
+      background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 3px);
+    }
+
+    .scope { position: relative; width: min(52vw, 220px); aspect-ratio: 1; border-radius: 50%; border: 2px solid var(--green); box-shadow: 0 0 24px rgba(0, 255, 102, 0.45), inset 0 0 30px rgba(0, 255, 102, 0.2); overflow: hidden; }
+    .scope::before { content: ""; position: absolute; inset: 0; background: repeating-radial-gradient(circle, transparent 0 26px, rgba(0, 255, 102, 0.28) 26px 27px); }
+    .scope::after { content: ""; position: absolute; inset: 0; background: conic-gradient(from 0deg, rgba(0, 255, 102, 0.55), rgba(0, 255, 102, 0) 22%, transparent); animation: spin 2.4s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .checks { list-style: none; width: min(100%, 360px); display: flex; flex-direction: column; gap: 10px; }
+    .checks li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 14px; border: 1px solid rgba(0, 255, 102, 0.28); border-radius: 8px; font-size: 13px; letter-spacing: 1.5px; }
+    .checks .v { font-weight: bold; text-align: right; }
+    .checks li[data-state="wait"] .v { color: var(--cyan); animation: blink 1s steps(2) infinite; }
+    .checks li[data-state="ok"] .v { color: var(--green); text-shadow: 0 0 8px rgba(0, 255, 102, 0.7); }
+    .checks li[data-state="err"] { border-color: var(--red); }
+    .checks li[data-state="err"] .v { color: var(--red); }
+    .checks li[data-state="warn"] .v { color: var(--amber); }
+    @keyframes blink { 50% { opacity: 0.25; } }
+
+    .msg { min-height: 4.2em; width: min(100%, 360px); text-align: center; font-size: 14px; line-height: 1.5; letter-spacing: 1px; color: var(--cyan); }
+    .msg.err { color: var(--red); }
+    .msg.ok { color: var(--green); }
+    .msg.tap { animation: blink 1.2s steps(2) infinite; }
+  </style>
+</head>
+<body>
+  <div class="scope" aria-hidden="true"></div>
+
+  <ul class="checks">
+    <li id="r-geo"     data-state="wait"><span>ORTUNG (GPS)</span>      <span class="v">…</span></li>
+    <li id="r-compass" data-state="wait"><span>KOMPASS</span>           <span class="v">…</span></li>
+    <li id="r-motion"  data-state="wait"><span>BEWEGUNGSSENSOREN</span> <span class="v">…</span></li>
+    <li id="r-wake"    data-state="wait"><span>DISPLAY-SPERRE</span>    <span class="v">…</span></li>
+  </ul>
+
+  <div class="msg" id="msg" role="status"></div>
+
+  <script>
+  "use strict";
+
+  /* ======================================================================
+     init.html – fordert beim Laden automatisch alle Berechtigungen an
+     und leitet danach zur index.html weiter.
+
+     Hinweis zu iOS: Safari erlaubt die Kompass-/Bewegungs-Abfrage nur nach einer Berührung des
+     Displays. Dann erscheint "BILDSCHIRM ANTIPPEN" – ein Tipp irgendwo reicht.
+     Android/Chrome braucht das nicht.
+     ====================================================================== */
+
+  const $ = (id) => document.getElementById(id);
+  const REDIRECT_DELAY_MS = 1000;
+
+  function setRow(key, state, text) {
+    const row = $("r-" + key);
+    row.dataset.state = state;
+    row.querySelector(".v").textContent = text;
+  }
+  function setMsg(text, kind) {
+    const m = $("msg");
+    m.textContent = text;
+    m.className = "msg" + (kind ? " " + kind : "");
+  }
+
+  /* Ein Tipp aufs Display (nötig für iOS-Sensor-Freigabe oder zum erneuten Versuch) */
+  let tapAction = null;
+  document.addEventListener("click", () => {
+    const f = tapAction;
+    tapAction = null;
+    if (f) f();
+  });
+
+  /* ---------- 1) Standort ---------- */
+  async function checkGeo() {
+    if (!navigator.geolocation) { setRow("geo", "err", "NICHT VERFÜGBAR"); return false; }
+
+    let state = "unknown";
+    try { state = (await navigator.permissions.query({ name: "geolocation" })).state; } catch (e) { /* nicht unterstützt */ }
+    if (state === "denied") { setRow("geo", "err", "BLOCKIERT"); return false; }
+
+    const opts = { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 };
+
+    if (state === "granted") {
+      // Schon erlaubt: GPS im Hintergrund „aufwärmen“, damit der erste Fix in der Radar-Ansicht schneller kommt
+      navigator.geolocation.getCurrentPosition(() => {}, () => {}, opts);
+      setRow("geo", "ok", "OK");
+      return true;
+    }
+
+    setRow("geo", "wait", "BITTE ERLAUBEN");
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        () => { setRow("geo", "ok", "OK"); resolve(true); },
+        (err) => {
+          if (err.code === 1) { setRow("geo", "err", "BLOCKIERT"); resolve(false); }
+          else { setRow("geo", "ok", "OK · NOCH KEIN SIGNAL"); resolve(true); }   // erlaubt, nur gerade kein Fix
+        },
+        opts
+      );
+    });
+  }
+
+  /* ---------- 2) Display-Sperre ---------- */
+  async function checkWake() {
+    if (!("wakeLock" in navigator)) { setRow("wake", "warn", "NICHT UNTERSTÜTZT"); return; }
+    try {
+      const lock = await navigator.wakeLock.request("screen");
+      await lock.release();
+      setRow("wake", "ok", "OK");
+    } catch (e) {
+      setRow("wake", "warn", "BEI BERÜHRUNG");
+    }
+  }
+
+  /* ---------- 3) Kompass & Bewegung ---------- */
+  const hasPermissionApi =
+    typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function";
+
+  /** Wartet auf ein passendes Event; true, wenn innerhalb von ms etwas ankommt */
+  function probeEvent(types, test, ms = 1500) {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (v) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        types.forEach((t) => window.removeEventListener(t, handler, true));
+        resolve(v);
+      };
+      const handler = (e) => { if (test(e)) finish(true); };
+      types.forEach((t) => window.addEventListener(t, handler, true));
+      const timer = setTimeout(() => finish(false), ms);
+    });
+  }
+
+  const probeCompass = () => probeEvent(
+    ["deviceorientationabsolute", "deviceorientation"],
+    (e) => typeof e.webkitCompassHeading === "number" || (e.alpha !== null && e.alpha !== undefined && e.absolute === true)
+  );
+  const probeMotion = () => probeEvent(
+    ["devicemotion"],
+    (e) => e.accelerationIncludingGravity && e.accelerationIncludingGravity.x !== null
+  );
+
+  /** Chrome/Android: Generic Sensor API (Magnetometer + Gyro + Beschleunigung) anfordern */
+  function probeSensorApi(ms = 1500) {
+    return new Promise((resolve) => {
+      if (!("AbsoluteOrientationSensor" in window)) { resolve(false); return; }
+      let sensor;
+      const finish = (v) => { try { sensor && sensor.stop(); } catch (e) { /* ignorieren */ } clearTimeout(timer); resolve(v); };
+      const timer = setTimeout(() => finish(false), ms);
+      try {
+        sensor = new AbsoluteOrientationSensor({ frequency: 20 });
+        sensor.addEventListener("reading", () => finish(true));
+        sensor.addEventListener("error", () => finish(false));
+        sensor.start();
+      } catch (e) { finish(false); }
+    });
+  }
+
+  function showSensorResult(compass, motion) {
+    setRow("compass", compass ? "ok" : "warn", compass ? "OK" : "NICHT VERFÜGBAR");
+    setRow("motion", motion ? "ok" : "warn", motion ? "OK" : "NICHT VERFÜGBAR");
+  }
+
+  /** Fragt Ausrichtung + Bewegung an. Ergebnis je Eintrag: "ok" | "denied" | "gesture" (Safari: Tipp nötig) */
+  function requestOrientationPermissions() {
+    const reqs = [DeviceOrientationEvent.requestPermission()];
+    if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
+      reqs.push(DeviceMotionEvent.requestPermission());
+    }
+    return Promise.all(reqs.map((p) => p.then(
+      (r) => (r === "granted" ? "ok" : "denied"),
+      (e) => (e && e.name === "NotAllowedError" ? "gesture" : "denied")
+    )));
+  }
+
+  async function checkSensors() {
+    let perm = ["ok"];
+
+    if (hasPermissionApi) {
+      // Chrome beantwortet das sofort, Safari verlangt eine Berührung des Displays
+      perm = await requestOrientationPermissions();
+
+      if (perm.includes("gesture")) {
+        // Evtl. in dieser Sitzung schon freigegeben → Events kommen auch ohne Tipp
+        const [c] = await Promise.all([probeCompass(), probeMotion()]);
+        if (c) {
+          perm = ["ok"];
+        } else {
+          setRow("compass", "wait", "TIPPEN");
+          setRow("motion", "wait", "TIPPEN");
+          perm = await new Promise((resolve) => {
+            // Direkt im Tipp anfragen (Safari verlangt die Nutzer-Geste)
+            tapAction = () => resolve(requestOrientationPermissions());
+          });
+        }
+      }
+
+      if (perm.includes("denied") || perm.includes("gesture")) {
+        setRow("compass", "err", "ABGELEHNT");
+        setRow("motion", "err", "ABGELEHNT");
+        setMsg("KOMPASS ABGELEHNT – DIE RICHTUNG KOMMT DANN AUS DER GEHRICHTUNG.", "err");
+        return;
+      }
+    }
+
+    // Prüfen, ob wirklich Messwerte ankommen (Chrome/Android: zusätzlich die Generic-Sensor-API anfordern)
+    const [compassEvents, sensorApi, motion] = await Promise.all([probeCompass(), probeSensorApi(), probeMotion()]);
+    showSensorResult(compassEvents || sensorApi, motion || sensorApi);
+  }
+
+  /* ---------- Ablauf ---------- */
+  let running = false;
+
+  async function run() {
+    if (running) return;
+    running = true;
+    setMsg("SYSTEM WIRD EINGERICHTET …");
+    ["geo", "compass", "motion", "wake"].forEach((k) => setRow(k, "wait", "…"));
+
+    const geoTask = checkGeo();
+    const wakeTask = checkWake();
+    const sensorTask = checkSensors();
+    // Nur Safari/iOS: Kompass-Freigabe braucht einen Tipp aufs Display
+    if (hasPermissionApi) setTimeout(() => {
+      if (tapAction && $("r-compass").dataset.state === "wait") setMsg("BILDSCHIRM ANTIPPEN, UM DEN KOMPASS FREIZUGEBEN", "tap");
+    }, 1700);
+
+    const geoOk = await geoTask;
+    if (!geoOk) {
+      setMsg("STANDORT BLOCKIERT. Bitte in den Browser-Einstellungen für diese Seite „Standort“ erlauben. Danach Bildschirm antippen.", "err");
+      running = false;
+      tapAction = run;                                     // erneuter Versuch per Tipp
+      return;
+    }
+
+    await Promise.all([wakeTask, sensorTask]);
+
+    setMsg("SYSTEM BEREIT", "ok");
+    try { sessionStorage.setItem("radar.initDone", "1"); } catch (e) { /* ignorieren */ }
+    setTimeout(() => location.replace("index.html"), REDIRECT_DELAY_MS);
+  }
+
+  run();
+  </script>
+</body>
+</html>
