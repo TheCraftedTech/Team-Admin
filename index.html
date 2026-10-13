@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <title>Alien-Rallye</title>
+  <title>Schnitzel.Art – Alien-Rallye</title>
 
   <!-- ===== PWA / Mobile-Meta ===== -->
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -27,9 +27,10 @@
   <header class="topbar">
     <div class="brand">
       <span class="brand-dot"></span>
-      <span class="brand-text">ALIEN<span>//</span>RALLYE</span>
+      <span class="brand-text">SCHNITZEL<span>.</span>ART</span>
     </div>
     <div class="topbar-right">
+      <span id="wakeStatus" class="wake" data-state="off">○ WACH</span>
       <span class="score" title="Punkte">◈ <b id="score">0</b></span>
       <button id="soundBtn" class="icon-btn" aria-label="Ton an/aus" title="Ton an/aus">♪</button>
     </div>
@@ -37,7 +38,7 @@
 
   <section class="progress" aria-label="Fortschritt">
     <div class="progress-label">
-      <span id="progressText">SEKTOR 0 / 0</span>
+      <span id="progressText">STATION 0 / 0</span>
       <span id="progressPct">0%</span>
     </div>
     <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
@@ -47,7 +48,12 @@
 
   <footer class="footer">
     <div class="artifacts" id="artifacts" aria-label="Gesammelte Artefakte"></div>
-    <button id="resetBtn" class="link-btn">&gt; Spiel zurücksetzen</button>
+    <div class="debug-bar" id="debugBar" hidden>
+      <span>DEBUG</span>
+      <button id="dbgPrev" class="link-btn" type="button">⏮ zurück</button>
+      <button id="dbgSkip" class="link-btn" type="button">⏭ überspringen</button>
+    </div>
+    <button id="resetBtn" class="link-btn" type="button">&gt; Spiel zurücksetzen</button>
   </footer>
 
   <!-- Scanner-Overlay (wird beim Prüfen der Antwort eingeblendet) -->
@@ -58,6 +64,9 @@
     </div>
   </div>
 
+  <script src="lib.js"></script>
+  <script src="stations.js"></script>
+  <script src="types.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
