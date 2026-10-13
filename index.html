@@ -1,2 +1,63 @@
-Hallo!
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Alien-Rallye</title>
 
+  <!-- ===== PWA / Mobile-Meta ===== -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a12">
+  <meta name="description" content="Interaktive Stadtrallye: Verteidige die Erde gegen die Alien-Invasion!">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Alien-Rallye">
+
+  <!-- Zum Aktivieren der Offline-Fähigkeit (Dateien siehe Anleitung):
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  -->
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="radar" aria-hidden="true"></div>
+  <div class="scanlines" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-dot"></span>
+      <span class="brand-text">ALIEN<span>//</span>RALLYE</span>
+    </div>
+    <div class="topbar-right">
+      <span class="score" title="Punkte">◈ <b id="score">0</b></span>
+      <button id="soundBtn" class="icon-btn" aria-label="Ton an/aus" title="Ton an/aus">♪</button>
+    </div>
+  </header>
+
+  <section class="progress" aria-label="Fortschritt">
+    <div class="progress-label">
+      <span id="progressText">SEKTOR 0 / 0</span>
+      <span id="progressPct">0%</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+  </section>
+
+  <main id="app" aria-live="polite"></main>
+
+  <footer class="footer">
+    <div class="artifacts" id="artifacts" aria-label="Gesammelte Artefakte"></div>
+    <button id="resetBtn" class="link-btn">&gt; Spiel zurücksetzen</button>
+  </footer>
+
+  <!-- Scanner-Overlay (wird beim Prüfen der Antwort eingeblendet) -->
+  <div class="scanner" id="scanner" hidden>
+    <div class="scanner-box">
+      <div class="scanner-line"></div>
+      <p id="scannerText">SCAN LÄUFT…</p>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
