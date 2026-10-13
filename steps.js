@@ -7,11 +7,11 @@
      locate    Ortungs-Radar zu einem Ort.       Felder: lat, lng, radius, maxAccuracy, fixes
                (ein Ort = ein Schritt; „WEITER“ erscheint erst am Ort)
      password  Eingabefeld für ein Passwort.     Felder: md (Text darüber), placeholder, answers[], button
-     memory    Minispiel: Muster merken und nachtippen (Seite 1 Anleitung, Seite 2 Spiel – ohne Scrollen).
-                                                 Felder: md (Anleitung), button (Anleitung → Spiel), startLabel (Start im Spiel),
-                                                 size (Raster, 5 = 5×5), dots (leuchtende Tasten; Zahl oder Liste je Runde, z. B. [4, 5, 6]),
-                                                 rounds (Runden hintereinander; ein Fehler = Kombo von vorne),
-                                                 blinks (wie oft das Muster blinkt), onMs, offMs (Blinktempo)
+     memory    Minispiel: Muster merken und nachtippen. EINE Runde = EIN Schritt (füllt den Bildschirm, kein Scrollen).
+                                                 Felder: startLabel (Start-Button), size (Raster, 5 = 5×5), dots (leuchtende Tasten),
+                                                 round / rounds (nur Anzeige „RUNDE 2 / 3“), blinks, onMs, offMs (Blinktempo),
+                                                 autoStart (Runde beginnt sofort), backTo (id: Ziel des „‹ ZURÜCK“-Knopfs),
+                                                 failTo (id: bei einem Fehler dorthin springen, sonst neues Muster im selben Schritt)
      end       Abschlussseite.                   Felder: md
 
    Gemeinsame Felder: id (eindeutig, unter ihr wird der Fortschritt gespeichert) und
@@ -25,6 +25,8 @@
    Achtung: Wer die Seite im Browser untersucht, kann alle Dateien in content/ abrufen – Hash-Namen
    verhindern nur das Erraten, keine Einsicht in steps.js.
 
+   Es gibt keine Obergrenze für Schritte: lieber jedes Detail als eigenen Schritt anlegen, dann lässt sich
+   alles einzeln dokumentieren, testen und in der Debug-Seite vor- und zurückspulen.
    Neuen Schritt einbauen: ein Objekt an der gewünschten Stelle in STEPS einfügen.
    Das Modul „password“ ist fertig, wird aber noch von keinem Schritt benutzt: Sobald die Passwörter
    des Story-Guides feststehen, kommt dort, wo sie gebraucht werden, ein Schritt mit type: "password"
@@ -51,7 +53,14 @@ const STEPS = [
   { id: "ort3", type: "locate", title: "Ort 3", lat: 47.760105831192874, lng: 8.839979882181922 },
   { id: "ort4", type: "locate", title: "Ort 4", lat: 47.76058112053592,  lng: 8.841501782310322 },
 
-  { id: "stoersender", type: "memory", title: "Minispiel: Störsender", md: "d027c79e", button: "ZUM SPIEL", startLabel: "STÖRSENDER ANGREIFEN", size: 5, dots: 5, rounds: 3 },
+  /* Minispiel „Störsender“: bewusst viele kleine Schritte (jeder ist einzeln anspringbar und dokumentierbar).
+     Die Anleitung ist ein normaler Info-Schritt, jede der drei Runden ein eigener Spiel-Schritt.
+     Ein Fehler in Runde 2 oder 3 führt per failTo zurück zu Runde 1 („Kombo von vorne“). */
+  { id: "stoersender-anleitung", type: "info", title: "Störsender: Anleitung", md: "d027c79e", button: "ZUM SPIEL" },
+  { id: "stoersender-1", type: "memory", title: "Störsender: Runde 1", round: 1, rounds: 3, dots: 5, startLabel: "STÖRSENDER ANGREIFEN", backTo: "stoersender-anleitung" },
+  { id: "stoersender-2", type: "memory", title: "Störsender: Runde 2", round: 2, rounds: 3, dots: 5, autoStart: true, failTo: "stoersender-1", backTo: "stoersender-anleitung" },
+  { id: "stoersender-3", type: "memory", title: "Störsender: Runde 3", round: 3, rounds: 3, dots: 5, autoStart: true, failTo: "stoersender-1", backTo: "stoersender-anleitung" },
+  { id: "stoersender-fertig", type: "info", title: "Störsender: deaktiviert", md: "6c4d0427", button: "WEITER" },
 
   { id: "ort5", type: "locate", title: "Ort 5", lat: 47.76114913914456,  lng: 8.841115675526469 },
   { id: "ort6", type: "locate", title: "Ort 6", lat: 47.76170564732148,  lng: 8.842634771566102 },

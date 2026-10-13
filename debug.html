@@ -309,7 +309,7 @@
         if (!fake.active) setFake(s.step.lat - mToLat(150), s.step.lng);
         stepToward(s.step, Number($("stepM").value) || 12);
       } else if (t === "memory") {
-        if ((s.info.view === "guide" || s.info.phase === "idle") && mainButton()) pressMain();
+        if (s.info.phase === "idle" && mainButton()) pressMain();
         else if (s.info.phase === "input") solveMemory();
       } else if (t === "password") {
         if (autoWait === 0) { fillPassword((s.step.answers || [""])[0]); autoWait = 1; }
@@ -377,7 +377,7 @@
       lines.push(`Kompass: ${s.heading === null ? "–" : Math.round(s.heading) + "°"}`);
     }
     if (s.step.type === "memory" && s.info) {
-      lines.push(`Seite: ${s.info.view === "guide" ? "Anleitung" : "Spiel"}   Runde: ${Math.min(s.info.solved + 1, s.info.rounds)} / ${s.info.rounds}   Phase: ${s.info.phase}   getippt: ${s.info.found.length} / ${s.info.pattern.length}`);
+      lines.push(`Runde ${s.info.round} / ${s.info.rounds}   Phase: ${s.info.phase}   getippt: ${s.info.found.length} / ${s.info.pattern.length}` + (s.info.failTo ? `   bei Fehler → ${s.info.failTo}` : ""));
     }
     box.textContent = lines.join("\n");
   }

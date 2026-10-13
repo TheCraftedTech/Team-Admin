@@ -294,7 +294,7 @@ function onPositionError(err) {
    ----------------------------------------------------------------------
    Ein Modul ist eine Funktion (ctx) => instanz. Sie baut ihre Oberfläche in ctx.root auf.
    ctx:       step (die Inhalte aus steps.js), index, root, data (gespeichert je Schritt),
-              save(), next() (zum nächsten Schritt)
+              save(), next() (zum nächsten Schritt), goToId(id) (zu einem Schritt per id)
    instanz:   destroy()     aufräumen, wenn der Schritt verlassen wird
               onPosition()  optional: neue GPS-Daten sind da
               info()        optional: Zustand für die Debug-Seite
@@ -330,7 +330,14 @@ function showStep() {
     root: view,
     data: state.data[step.id],
     save: saveState,
-    next() { if (state.index < STEPS.length - 1) goTo(state.index + 1); }
+    next() { if (state.index < STEPS.length - 1) goTo(state.index + 1); },
+    /** Zu einem Schritt anhand seiner id springen (true, wenn es ihn gibt) */
+    goToId(id) {
+      const i = STEPS.findIndex((s) => s.id === id);
+      if (i < 0) return false;
+      goTo(i);
+      return true;
+    }
   };
   current = { step, ctx, instance: null };
   current.instance = factory(ctx) || {};
