@@ -244,25 +244,108 @@
   /* ======================================================================
      Kompass (Geräte-Ausrichtung)
      ====================================================================== */
-  let heading = null;       // Blickrichtung in Grad (0 = Norden), null = unbekannt
+  /* Quellen, nach Priorität:
+       1. AbsoluteOrientationSensor (Generic Sensor API, Chrome/Android: Magnetometer + Gyro + Beschleunigung)
+       2. deviceorientationabsolute / deviceorientation (alpha, beta, gamma → volle 3D-Drehung)
+       3. iOS: webkitCompassHeading (+ Genauigkeit)
+       4. GPS-Bewegungsrichtung (coords.heading), wenn man läuft und kein Kompass liefert
+     Aus Alpha/Beta/Gamma bzw. dem Quaternion werden die Geräteachsen in Welt-Koordinaten
+     (x = Ost, y = Nord, z = oben) berechnet. Liegt das Handy flach, zeigt die Gerätespitze
+     die Richtung, wird es aufrecht gehalten, die Rückseite (Kamera-Richtung) – so stimmt der
+     Radar in jeder Haltung, ohne dass man das Handy waagerecht halten muss. */
+  let heading = null;          // Ergebnis: Blickrichtung in Grad (0 = Norden), null = unbekannt
+  let headingSrc = "";         // Woher kommt der Wert (nur Anzeige)
+  let sensorHd = null, sensorAt = 0;     // letzter Kompasswert (geglättet)
+  let gpsHd = null, gpsAt = 0;           // Bewegungsrichtung laut GPS
+  let compassAcc = null;                 // iOS: Genauigkeit in Grad (-1 = unkalibriert)
+  let sensorApiActive = false;
+
+  /** Kompassrichtung aus den Geräteachsen (Welt-Koordinaten) */
+  function headingFromAxes(top, zAxis) {
+    const flat = Math.abs(zAxis.z) > 0.6;                       // Display zeigt zum Himmel/Boden
+    const v = flat ? top : { x: -zAxis.x, y: -zAxis.y };        // sonst: Rückseite des Geräts
+    if (Math.hypot(v.x, v.y) < 1e-3) return null;
+    return (deg(Math.atan2(v.x, v.y)) + 360) % 360;
+  }
+
+  /** Geräteachsen aus alpha/beta/gamma (W3C-Reihenfolge Z-X'-Y'') */
+  function axesFromEuler(alpha, beta, gamma) {
+    const a = rad(alpha), b = rad(beta), c = rad(gamma);
+    const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b), cg = Math.cos(c), sg = Math.sin(c);
+    return {
+      top:   { x: -sa * cb,                  y: ca * cb,                  z: sb },
+      zAxis: { x: ca * sg + sa * sb * cg,    y: sa * sg - ca * sb * cg,   z: cb * cg }
+    };
+  }
+
+  /** Geräteachsen aus einem Quaternion [x, y, z, w] */
+  function axesFromQuaternion(q) {
+    const [x, y, z, w] = q;
+    return {
+      top:   { x: 2 * (x * y - z * w),  y: 1 - 2 * (x * x + z * z),  z: 2 * (y * z + x * w) },
+      zAxis: { x: 2 * (x * z + y * w),  y: 2 * (y * z - x * w),      z: 1 - 2 * (x * x + y * y) }
+    };
+  }
+
+  function setSensorHeading(hd, src) {
+    sensorHd = sensorHd === null ? hd : (sensorHd + angleDiff(hd, sensorHd) * 0.2 + 360) % 360;
+    sensorAt = performance.now();
+    headingSrc = src;
+    resolveHeading();
+  }
+
+  /** Entscheidet, welche Quelle gerade gilt (Kompass → GPS-Richtung → keine) */
+  function resolveHeading() {
+    const now = performance.now();
+    if (sensorHd !== null && now - sensorAt < 3000) { heading = sensorHd; return; }
+    if (gpsHd !== null && now - gpsAt < 8000) { heading = gpsHd; headingSrc = "GPS"; return; }
+    heading = null; headingSrc = "";
+  }
 
   function onOrientation(e) {
-    let hd = null;
-    if (typeof e.webkitCompassHeading === "number") hd = e.webkitCompassHeading;                         // iOS
-    else if (e.absolute && e.alpha !== null && e.alpha !== undefined) hd = (360 - e.alpha) % 360;       // Android
-    if (hd === null) return;
-    heading = heading === null ? hd : (heading + angleDiff(hd, heading) * 0.25 + 360) % 360;
+    if (sensorApiActive) return;                                  // Sensor-API hat Vorrang
+    if (typeof e.webkitCompassHeading === "number") {             // iOS
+      compassAcc = typeof e.webkitCompassAccuracy === "number" ? e.webkitCompassAccuracy : null;
+      if (e.webkitCompassHeading >= 0) setSensorHeading(e.webkitCompassHeading, "iOS");
+      return;
+    }
+    if (!e.absolute || e.alpha == null || e.beta == null || e.gamma == null) return;
+    const ax = axesFromEuler(e.alpha, e.beta, e.gamma);
+    const hd = headingFromAxes(ax.top, ax.zAxis);
+    if (hd !== null) setSensorHeading(hd, "KOMPASS");
   }
+
+  function startOrientationSensor() {
+    if (!("AbsoluteOrientationSensor" in window)) return;
+    try {
+      const sensor = new AbsoluteOrientationSensor({ frequency: 30, referenceFrame: "device" });
+      sensor.addEventListener("reading", () => {
+        if (!sensor.quaternion) return;
+        const ax = axesFromQuaternion(sensor.quaternion);
+        const hd = headingFromAxes(ax.top, ax.zAxis);
+        if (hd === null) return;
+        sensorApiActive = true;
+        setSensorHeading(hd, "SENSOR");
+      });
+      sensor.addEventListener("error", () => { sensorApiActive = false; });   // dann greifen die Events
+      sensor.start();
+    } catch (e) { /* nicht verfügbar / blockiert → Events nutzen */ }
+  }
+
   function listenOrientation() {
+    startOrientationSensor();
     window.addEventListener("deviceorientationabsolute", onOrientation, true);
     window.addEventListener("deviceorientation", onOrientation, true);
   }
 
   if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
-    // iOS: Erlaubnis nur nach Tipp möglich
+    // iOS: Erlaubnis nur nach Tipp möglich (Ausrichtung UND Bewegung)
     $("hint").hidden = false;
     document.addEventListener("click", async () => {
       try {
+        if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
+          DeviceMotionEvent.requestPermission().catch(() => {});
+        }
         if ((await DeviceOrientationEvent.requestPermission()) === "granted") listenOrientation();
       } catch (e) { /* ohne Kompass weiter */ }
       $("hint").hidden = true;
@@ -278,6 +361,10 @@
 
   function onPosition(p) {
     pos = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy };
+    // Bewegungsrichtung laut GPS (nur beim Gehen verlässlich) – Reserve, falls kein Kompass da ist
+    const { heading: gh, speed } = p.coords;
+    if (typeof gh === "number" && !Number.isNaN(gh) && (speed || 0) > 0.8) { gpsHd = gh; gpsAt = performance.now(); }
+    resolveHeading();
     refresh();
   }
 
@@ -363,9 +450,13 @@
         ? `PEILUNG ${compassWord(pos.brg)} · NORDEN = OBEN`
         : `ZIEL ${relativeWord((pos.brg - heading + 360) % 360)}`;
     }
-    info.textContent = `GPS ±${Math.round(pos.acc)} m · KOMPASS ${heading === null ? "AUS" : "AN"}`;
+    const compass = heading === null ? "AUS" : `${Math.round(heading)}° ${headingSrc}`;
+    const uncalibrated = compassAcc !== null && (compassAcc < 0 || compassAcc > 30);
+    info.textContent = uncalibrated
+      ? "KOMPASS UNGENAU – HANDY IN EINER 8 SCHWENKEN"
+      : `GPS ±${Math.round(pos.acc)} m · KOMPASS ${compass}`;
   }
-  setInterval(render, 400);   // Kompass ändert sich öfter als das GPS
+  setInterval(() => { resolveHeading(); render(); }, 400);   // Kompass ändert sich öfter als das GPS
 
   /* ======================================================================
      Radar-Zeichnung
