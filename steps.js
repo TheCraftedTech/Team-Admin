@@ -58,65 +58,18 @@
      todo    nur für die Debug-Seite: kurze Notiz, was noch zu tun ist
    Die Seiten selbst zeigen nie etwas davon; die Debug-Seite trennt „fertig“ und „Platzhalter ersetzen“.
 
-   TEXTE UND BILDER (Markdown): md ist die ID einer Datei im Ordner content/, z. B. md: "8861a3f4"
-   lädt content/8861a3f4.md. Bilder liegen im selben Ordner, ebenfalls mit Hash als Namen, und
-   werden im Markdown nur mit dem Dateinamen eingebunden:  ![Beschreibung](9bde63bf.png)
-   Hash-Namen anlegen:  node tools/hashify.js bild.png text.md   (kopiert die Dateien nach content/)
-   BILDER haben immer das Format 16:9 (z. B. 1280 × 720): Die Seite zeigt sie in fester Größe, anders geformte Bilder werden
-   mittig zugeschnitten. Ein Bild lässt sich einfach austauschen: die Datei in content/ mit demselben Namen überschreiben
-   (der Dateiname muss nicht zum Inhalt passen). Nach dem Austausch den Browser-Cache leeren, sonst erscheint noch das alte Bild.
-   oder einen neuen Text mit festem Namen:  node tools/hashify.js --neu
-   Achtung: Wer die Seite im Browser untersucht, kann alle Dateien in content/ abrufen – Hash-Namen
-   verhindern nur das Erraten, keine Einsicht in steps.js.
+   TEXTE, BILDER, AUDIO: md ist die ID einer Markdown-Datei im Ordner content/ (md: "8861a3f4" lädt content/8861a3f4.md).
+   Bilder und Audio liegen im selben Ordner; Bilder werden im Markdown mit dem Dateinamen eingebunden: ![Beschreibung](9bde63bf.png),
+   eine Audiodatei trägt das Feld src des Audio-Schritts. Hash-Namen anlegen:
+     node tools/hashify.js bild.png aufnahme.mp3 text.md     kopiert die Dateien mit Hash-Namen nach content/
+     node tools/hashify.js --neu                             legt einen neuen Text mit festem Namen an
+   Bilder haben das Format 16:9 (z. B. 1280 × 720); die Seite zeigt sie in fester Größe, andere Formate werden mittig zugeschnitten.
+   Ein Bild lässt sich austauschen, indem die Datei in content/ mit demselben Namen überschrieben wird (danach den Browser-Cache leeren).
+   Achtung: Wer die Seite im Browser untersucht, kann alle Dateien in content/ abrufen – Hash-Namen verhindern nur das Erraten.
 
-   TEXT-ÜBERSICHT (T = Text, B = Bild; die Nummern bleiben stabil, auch wenn die Reihenfolge geändert wird)
-     T01  Einführung: Kunstwerk Turm VI      content/8861a3f4.md   Platzhalter
-     T39  Das Handy meldet sich (Story-Start)   content/4beb0d1c.md   Platzhalter   (Bild B01: 9bde63bf.png)
-     T10  Wichtige Hinweise (Sicherheit)     content/ce0d842b.md   fertig
-     T11  Schmierpapier und Stift            content/1b49aee5.md   fertig
-     T02  Story 1 (nach Ort 2)               content/2bfc795f.md   Platzhalter   (Bild B03: bcb145ef.jpg)
-     T03  Story 2 (nach Ort 3)               content/07188df6.md   Platzhalter   (Bild B04: d558c290.png)
-     T04  Story 3 (nach Ort 4)               content/609fe145.md   Platzhalter   (Bild B05: 1b921479.jpg) – erst gestört, nach dem Störsender lesbar
-     T12  Hinweis „Signal gestört“           content/1d44835b.md   fertig
-     T05  Störsender: Anleitung              content/d027c79e.md   fertig
-     T06  Meldung „Störsender abgeschaltet“  content/6c4d0427.md   fertig        (steht als Kasten über der lesbaren Story 3)
-     T07  Story 4 (nach Ort 5)               content/6181fe9d.md   Platzhalter   (Bild B07: 07d5b8c6.jpg)
-     T08  Story 5 (nach Ort 6)               content/70e24aae.md   Platzhalter   (Bild B08: 41b41829.png)
-     T13  Story 6 (Marktweiber, Ankunft)     content/a404e46e.md   Platzhalter   (Bild B10: 268d5d70.png)
-     T14  Eine Aufgabe für euch (Dialog)     content/bed8f3d0.md   Platzhalter   (Bild B11: c35292a8.jpg)
-     T15  Der belauschte Streit (Anleitung)  content/35e6e118.md   fertig
-     T16  Aufzeichnung rekonstruiert (Gespräch) content/e6a5e05c.md   fertig
-     T18  Aliens schicken euch weiter (Westen)  content/84e2cf1f.md   Platzhalter   (Bild B13: a9897d02.png)
-     T19  Eine Sternkarte (Kunst-Relikt)     content/14a6b5ec.md   Platzhalter   (Bild B14: 28ccfcba.jpg)
-     T21  Schaut euch die Karte an           content/f5e0f468.md   Platzhalter
-     T22  Ihr übernehmt die Navigation       content/6105ac99.md   fertig
-     T20  Simulation erfolgreich                 content/413e9fcd.md   Platzhalter   (Bild B15: 2c931172.png)
-     T23  Das nächste Signal (Weg zum Hauser-Brunnen) content/bfaae9dd.md   Platzhalter
-     T24  Erster Zwischenpunkt               content/e485be82.md   Platzhalter
-     T25  Zweiter Zwischenpunkt              content/d2792e96.md   Platzhalter
-     T26  Ankunft am Hauser-Brunnen          content/e4a719d8.md   Platzhalter
-     T27  Festplatte entschlüsseln: Anleitung   content/7e26f7d1.md   Platzhalter
-     T28  Frage 1 von 4 (Steine)             content/e8e9df6e.md   fertig
-     T29  Frage 2 von 4 (Metall)             content/2e662bfe.md   fertig
-     T30  Frage 3 von 4 (Höhe schätzen)      content/049c4674.md   fertig
-     T31  Frage 4 von 4 (Galgenmännchen)     content/fe3cda9c.md   fertig
-     T32  Festplatte entschlüsselt           content/59e8aa98.md   Platzhalter
-     T33  Der Aktivierungscode (Bild)        content/90ce1763.md   Platzhalter   (Bild B16: d6ad634b.jpg, Foto der Marktweiber-Figuren, 16:9 zugeschnitten)
-     T34  Notizzettel zum Aktivierungscode   content/5edb4ab3.md   Platzhalter
-     T35  Sender aktiviert: Daten gesendet   content/e9777b85.md   Platzhalter
-     T36  Die Antwort kommt (zum Ohr gehen)  content/a367b120.md   Platzhalter
-     T37  Ein Ohr für die Antwort            content/68a0892a.md   Platzhalter
-     T38  Die Antwort der Aliens (Audio)     content/7bb26811.md   Platzhalter   (Aufnahme: 136cd2ad.mp3, Platzhalter-Aufnahme)
-     T09  Ende (VORLÄUFIG)                   content/0845e9c6.md   Platzhalter   (Bild B09: a6db5dd6.jpg)
-
-   Es gibt keine Obergrenze für Schritte: lieber jedes Detail als eigenen Schritt anlegen, dann lässt sich
-   alles einzeln dokumentieren, testen und in der Debug-Seite vor- und zurückspulen.
-   Neuen Schritt einbauen: ein Objekt an der gewünschten Stelle in STEPS einfügen.
-   Das Modul „password“ ist fertig, wird aber noch von keinem Schritt benutzt: Sobald die Passwörter
-   des Story-Guides feststehen, kommt dort, wo sie gebraucht werden, ein Schritt mit type: "password"
-   und answers: [ … ] hinein.
-   Neues Modul bauen: in modules.js mit registerModule("name", (ctx) => …) anlegen und
-   hier mit type: "name" benutzen.
+   Die Übersicht aller Schritte und Texte steht in README.md; `node tools/overview.js` erzeugt sie neu.
+   Neuen Schritt einbauen: ein Objekt an der gewünschten Stelle in STEPS einfügen (jedes Detail darf ein eigener Schritt sein).
+   Neues Modul bauen: Datei in modules/ anlegen, darin registerModule("name", (ctx) => …), in index.html einbinden (siehe README.md).
    ========================================================================== */
 
 /* Vorgabewerte für alle „locate“-Schritte (jeder Schritt kann sie einzeln überschreiben).
@@ -145,8 +98,7 @@ const STEPS = [
      Die Story-Seiten dazwischen sind reine Wegführung: stehen bleiben, lesen, Gedanken machen, weitergehen. Die Aliens sprechen
      in verdrehter Satzstellung („Kaputt unser Navigationssystem ist“). */
   /* Ort 1 ist der Start (Turm VI, 47.758796076746 / 8.83948384873872): Dort findet die Einführung statt,
-     deshalb gibt es dafür keinen eigenen Ortungs-Schritt. Die Orte 2 bis 7 folgen der Reihe nach,
-     zwischen zwei Orten liegt jeweils mindestens ein Story-Schritt. */
+     deshalb gibt es dafür keinen eigenen Ortungs-Schritt. Zwischen zwei Orten liegt jeweils mindestens ein Story-Schritt. */
   { id: "ort2", type: "locate", title: "Ort 2", lat: 47.759442881868516, lng: 8.8405967427222, status: "fertig" },
   { id: "story-1", type: "info", title: "Story 1 (T02)", md: "2bfc795f", button: "VERSTANDEN",
     status: "platzhalter", todo: "Entwurf prüfen (reine Wegführung, Festplattenteil 1 von 6); Bild ersetzen" },

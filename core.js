@@ -1,7 +1,7 @@
 /* ==========================================================================
    core.js – Kern: Hilfsfunktionen, Fortschritt, Dienste (Wake Lock, Kompass, GPS)
-   und die Schritt-Steuerung. Die Module (modules.js) und die Inhalte (steps.js)
-   greifen darauf zu. Geladen wird: steps.js → core.js → modules.js.
+   und die Schritt-Steuerung. Die Module (modules/*.js) und die Inhalte (steps.js)
+   greifen darauf zu. Geladen wird: steps.js → markdown.js → core.js → modules/*.js (siehe index.html).
    ========================================================================== */
 "use strict";
 
@@ -100,19 +100,22 @@ function vibrateOnce() {
    ====================================================================== */
 const STORAGE_KEY = "radar.v3";   // reset.html leert den gesamten localStorage
 
+/** Gespeichert wird die id des aktuellen Schritts (nicht nur die Nummer): Wer Schritte einfügt oder umordnet,
+    behält so trotzdem seinen Platz. Die Nummer dient nur als Rückfall für ältere Spielstände. */
 function loadState() {
   const fresh = { index: 0, data: {} };
   try {
     const s = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
     if (!s) return fresh;
+    const byId = STEPS.findIndex((st) => st.id === s.step);
     return {
-      index: Number.isInteger(s.index) ? clamp(s.index, 0, STEPS.length - 1) : 0,
+      index: byId >= 0 ? byId : Number.isInteger(s.index) ? clamp(s.index, 0, STEPS.length - 1) : 0,
       data: s.data && typeof s.data === "object" ? s.data : {}
     };
   } catch (e) { return fresh; }
 }
 function saveState() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* privater Modus */ }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ step: STEPS[state.index].id, index: state.index, data: state.data })); } catch (e) { /* privater Modus */ }
 }
 
 let state = loadState();
