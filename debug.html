@@ -84,6 +84,7 @@
         <div class="row">
           <button type="button" id="tp">Zum Ort teleportieren</button>
           <button type="button" id="far">100 m davor</button>
+          <button type="button" id="near">35 m davor</button>
           <button type="button" id="step">Schritt zum Ort</button>
         </div>
         <div class="row">
@@ -220,7 +221,7 @@
   }
   function setFake(lat, lng) {
     fake.active = true; fake.lat = lat; fake.lng = lng;
-    sendFix(); sendFix();                    // zwei Messungen: so viele braucht das Spiel für die Ankunft
+    sendFix();
   }
   // Frische Fake-Messung, solange aktiv (sonst würde ein echtes GPS-Signal dazwischenfunken)
   setInterval(() => { try { sendFix(); } catch (e) { /* Spiel lädt gerade */ } }, 1000);
@@ -246,6 +247,11 @@
     const t = locateStep();
     setFake(t.lat - mToLat(100), t.lng);
     log("Fake-GPS 100 m südlich vom Ort.");
+  }));
+  $("near").addEventListener("click", () => act("35 m davor", () => {
+    const t = locateStep();
+    setFake(t.lat - mToLat(35), t.lng);
+    log("Fake-GPS 35 m südlich vom Ort (zwischen „Fast da“ und Ankunft).");
   }));
   $("step").addEventListener("click", () => act("Schritt", () => {
     const t = locateStep();
@@ -372,7 +378,7 @@
     if (s.step.md) lines.push(`Inhalt: content/${s.step.md}.md`);
     if (s.step.type === "locate" && s.info) {
       lines.push(`Entfernung: ${s.info.dist === null ? "–" : Math.round(s.info.dist) + " m"}   Angekommen: ${s.info.arrived ? "JA (WEITER sichtbar)" : "nein"}`);
-      lines.push(`Regel: Radius ${s.info.radius} m, Genauigkeit ≤ ${s.info.maxAcc} m, ${s.info.fixes} Messungen in Folge`);
+      lines.push(`Regel: Radius ${s.info.radius} m, Genauigkeit ≤ ${s.info.maxAcc} m, ${s.info.holdSeconds} s ununterbrochen (jetzt ${s.info.held.toFixed(1)} s); „FAST DA“ ab ${s.info.approach} m`);
       lines.push(s.pos ? `GPS ±${Math.round(s.pos.acc)} m (${fake.active ? "FAKE" : "echt"}, vor ${Math.round(s.pos.age)} s)` : "GPS: noch keine Position");
       lines.push(`Kompass: ${s.heading === null ? "–" : Math.round(s.heading) + "°"}`);
     }

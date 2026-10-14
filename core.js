@@ -1,5 +1,5 @@
 /* ==========================================================================
-   core.js – Kern: Hilfsfunktionen, Spielstand, Dienste (Wake Lock, Kompass, GPS)
+   core.js – Kern: Hilfsfunktionen, Fortschritt, Dienste (Wake Lock, Kompass, GPS)
    und die Schritt-Steuerung. Die Module (modules.js) und die Inhalte (steps.js)
    greifen darauf zu. Geladen wird: steps.js → core.js → modules.js.
    ========================================================================== */
@@ -61,7 +61,7 @@ function vibrateOnce() {
 }
 
 /* ======================================================================
-   Spielstand (localStorage): aktueller Schritt + Daten je Schritt (z. B. „am Ort angekommen“)
+   Fortschritt (localStorage): aktueller Schritt + Daten je Schritt (z. B. „am Ort angekommen“)
    ====================================================================== */
 const STORAGE_KEY = "radar.v3";   // reset.html leert den gesamten localStorage
 

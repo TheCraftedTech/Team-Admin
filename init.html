@@ -42,7 +42,7 @@
 </head>
 <body>
   <h1>BERECHTIGUNGEN</h1>
-  <p class="sub">Das Radar braucht Zugriff auf die folgenden Dinge. Wird beim Öffnen automatisch abgefragt – mit „Neu fragen“ kannst du jede Abfrage wiederholen. Danach diese Seite schließen und das Spiel (index.html) öffnen.</p>
+  <p class="sub">Das Radar braucht Zugriff auf die folgenden Dinge. Wird beim Öffnen automatisch abgefragt – mit „Neu fragen“ kannst du jede Abfrage wiederholen. Danach diese Seite schließen und die Schnitzeljagd (index.html) öffnen.</p>
 
   <ul>
     <li id="r-geo" data-state="wait">
@@ -117,7 +117,7 @@
   function showPermission(state) {
     if (state === "granted") setRow("geo", "ok", "ERLAUBT", "Die Seite darf den Standort nutzen.");
     else if (state === "denied") setRow("geo", "err", "BLOCKIERT", GEO_BLOCKED_HELP);
-    else if (state === "prompt") setRow("geo", "warn", "NOCH NICHT ERLAUBT", "Bitte die Anfrage des Browsers mit „Erlauben“ bestätigen – sonst kann das Spiel dich nicht orten.");
+    else if (state === "prompt") setRow("geo", "warn", "NOCH NICHT ERLAUBT", "Bitte die Anfrage des Browsers mit „Erlauben“ bestätigen – sonst kann die Schnitzeljagd dich nicht orten.");
     else setRow("geo", "wait", "UNBEKANNT", "Dieser Browser verrät den Status nicht. Er wird beim ersten Positionsempfang klar.");
   }
 

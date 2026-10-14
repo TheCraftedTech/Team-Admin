@@ -4,7 +4,7 @@
    info      Seite zum Durchlesen (Inhalt aus einer Markdown-Datei)
    locate    Ortungs-Radar zu einem Ort, „WEITER“ erst am Ort
    password  Eingabefeld für ein Passwort (Text darüber aus Markdown)
-   memory    Minispiel: Muster aus leuchtenden Tasten merken und nachtippen
+   memory    Aufgabe: Muster aus leuchtenden Tasten merken und nachtippen
    end       Abschlussseite (Inhalt aus einer Markdown-Datei)
    Inhalte und Reihenfolge stehen in steps.js, die Steuerung in core.js.
    Jedes Modul hat genau einen Haupt-Button mit der Klasse „go“ (die Debug-Seite findet ihn damit).
@@ -114,13 +114,16 @@ registerModule("password", (ctx) => {
 
 /* ======================================================================
    Modul „locate“ – Ortungs-Radar zu einem Ort (lat/lng)
-   Man kommt nur weiter, wenn man am Ort ist: dann erscheint unten „WEITER“.
+   Man kommt nur weiter, wenn man wirklich am Ort ist: Innerhalb von radius Metern, bei genauem GPS
+   (maxAccuracy) und holdSeconds Sekunden lang ununterbrochen – dann erscheint unten „WEITER“.
+   Schon ab approachRadius Metern zeigt die Statuszeile „FAST DA – NOCH ETWAS NÄHER“.
    ====================================================================== */
 registerModule("locate", (ctx) => {
   const S = ctx.step;
   const radius = S.radius ?? SETTINGS.radius;
+  const approach = S.approachRadius ?? SETTINGS.approachRadius;
   const maxAcc = S.maxAccuracy ?? SETTINGS.maxAccuracy;
-  const fixesNeeded = S.fixes ?? SETTINGS.fixes;
+  const holdMs = (S.holdSeconds ?? SETTINGS.holdSeconds) * 1000;
 
   /* ----- Oberfläche ----- */
   const canvas = document.createElement("canvas");
@@ -141,16 +144,42 @@ registerModule("locate", (ctx) => {
 
   /* ----- Logik: Entfernung, Ankunft ----- */
   let arrived = Boolean(ctx.data.arrived);   // eingerastet: bleibt, bis „WEITER“ gedrückt wird (auch nach Neuladen)
-  let inside = 0;                            // aufeinanderfolgende Messungen im Radius
+  let holdSince = 0;                         // seit wann die Ankunfts-Bedingung ununterbrochen erfüllt ist (0 = nicht erfüllt)
   let dist = null, brg = 0;
   let burst = 0;
+
+  /** Im Radius, GPS genau genug und die Messung ist frisch */
+  function inZone() {
+    return pos !== null && dist !== null && dist <= radius && pos.acc <= maxAcc && Date.now() - pos.t < 4000;
+  }
+
+  /** Ankunft prüfen: die Bedingung muss holdMs lang ohne Unterbrechung gelten (läuft bei jeder Messung und jede halbe Sekunde) */
+  function check() {
+    if (arrived) return;
+    if (!inZone()) { holdSince = 0; return; }
+    if (!holdSince) holdSince = Date.now();
+    if (Date.now() - holdSince >= holdMs) {
+      arrived = true;
+      ctx.data.arrived = true;
+      ctx.save();
+      vibrateOnce();
+      burst = 1;
+    }
+  }
 
   function render() {
     nextBtn.hidden = !arrived;
     if (arrived) setText(distEl, "DU BIST DA ✔");
     else setText(distEl, dist === null ? "ENTFERNUNG: – – –" : `ENTFERNUNG: ${formatMeters(dist)}`);
+
     const st = gpsStatus({ dist, radius, maxAcc });
-    setText(noteEl, st.text);
+    let text = st.text;
+    if (!st.error && !arrived && dist !== null) {
+      if (holdSince) text = `POSITION WIRD BESTÄTIGT … ${Math.max(1, Math.ceil((holdMs - (Date.now() - holdSince)) / 1000))} s`;
+      else if (dist <= radius && pos && pos.acc > maxAcc) text = `GPS NOCH UNGENAU (±${Math.round(pos.acc)} m) – BITTE KURZ STEHEN BLEIBEN`;
+      else if (dist <= approach) text = `FAST DA – NOCH ${Math.max(1, Math.round(dist - radius))} m NÄHER HERANGEHEN`;
+    }
+    setText(noteEl, text);
     noteEl.classList.toggle("err", st.error);
   }
 
@@ -158,27 +187,13 @@ registerModule("locate", (ctx) => {
     if (pos) {
       dist = distanceMeters(pos.lat, pos.lng, S.lat, S.lng);
       brg = bearingDeg(pos.lat, pos.lng, S.lat, S.lng);
-      if (!arrived) {
-        // „Sehr genau“: nah genug, GPS genau genug und mehrere Messungen in Folge
-        if (dist <= radius && pos.acc <= maxAcc) {
-          inside += 1;
-          if (inside >= fixesNeeded) {
-            arrived = true;
-            ctx.data.arrived = true;
-            ctx.save();
-            vibrateOnce();
-            burst = 1;
-          }
-        } else {
-          inside = 0;
-        }
-      }
     }
+    check();
     render();
   }
 
   nextBtn.addEventListener("click", () => { if (arrived) ctx.next(); });
-  const noteTimer = setInterval(render, 1000);   // Sekundenzähler und „Signal verloren“ aktuell halten
+  const noteTimer = setInterval(() => { check(); render(); }, 500);   // Zähler, „Signal verloren“ und die Haltezeit aktuell halten
   onPos();
 
   /* ----- Radar-Zeichnung ----- */
@@ -291,18 +306,18 @@ registerModule("locate", (ctx) => {
       clearInterval(noteTimer);
       window.removeEventListener("resize", resize);
     },
-    info: () => ({ type: "locate", dist, arrived, radius, maxAcc, fixes: fixesNeeded, inside })
+    info: () => ({ type: "locate", dist, arrived, radius, approach, maxAcc, holdSeconds: holdMs / 1000, held: holdSince ? (Date.now() - holdSince) / 1000 : 0 })
   };
 });
 
 /* ======================================================================
-   Modul „memory“ – Minispiel „Störsender“: EINE Runde = EIN Schritt
+   Modul „memory“ – Aufgabe „Störsender“: EIN Code = EIN Schritt
    Die Anleitung ist ein eigener „info“-Schritt davor, jede weitere Runde ein weiterer „memory“-Schritt.
    Die Seite füllt den Bildschirm ohne Scrollen. Auf dem Raster (size × size) leuchten dots Tasten
    mehrmals auf; danach tippt man genau diese Tasten an (Reihenfolge egal).
    Richtig → nächster Schritt. Falsch → neues Muster im selben Schritt, oder – mit failTo – zurück
-   zu einem anderen Schritt (z. B. zur ersten Runde: „die Kombo beginnt von vorne“).
-   Felder: startLabel, round/rounds (nur Anzeige „RUNDE 2 / 3“), size, dots, blinks, onMs, offMs,
+   zu einem anderen Schritt (z. B. zum ersten Code: „die Sperre beginnt von vorne“).
+   Felder: startLabel, round/rounds (nur Anzeige „CODE 2 / 3“), size, dots, blinks, onMs, offMs,
    autoStart (Runde beginnt sofort), backTo (Schritt-ID für den „‹ ZURÜCK“-Knopf), failTo (Schritt-ID bei Fehler)
    ====================================================================== */
 registerModule("memory", (ctx) => {
@@ -336,7 +351,7 @@ registerModule("memory", (ctx) => {
     back.addEventListener("click", () => ctx.goToId(S.backTo));
     topParts.push(back);
   }
-  topParts.push(h("div", "mem-title", S.label || (rounds > 1 ? `RUNDE ${round} / ${rounds}` : "STÖRSENDER")));
+  topParts.push(h("div", "mem-title", S.label || (rounds > 1 ? `CODE ${round} / ${rounds}` : "STÖRSENDER")));
 
   const leds = h("div", "dots");
   if (rounds > 1) {
@@ -425,7 +440,7 @@ registerModule("memory", (ctx) => {
 
       phase = "done";
       cells.forEach((c) => { c.disabled = true; });
-      setStatus("RICHTIG ✔", "ok");
+      setStatus("CODE AKZEPTIERT ✔", "ok");
       vibrateOnce();
       later(() => ctx.next(), 1000);
       return;
@@ -436,7 +451,7 @@ registerModule("memory", (ctx) => {
     cells[i].classList.add("bad");
     pattern.forEach((p) => { if (!found.has(p)) cells[p].classList.add("miss"); });
     cells.forEach((c) => { c.disabled = true; });
-    setStatus(S.failTo ? "FALSCH – DIE KOMBO BEGINNT VON VORNE …" : "FALSCH – NEUES MUSTER KOMMT …", "err");
+    setStatus(S.failTo ? "ALARM – FALSCHER CODE! DIE SPERRE SETZT SICH ZURÜCK …" : "ALARM – FALSCHER CODE! NEUES MUSTER KOMMT …", "err");
     later(() => { if (!S.failTo || !ctx.goToId(S.failTo)) startRound(); }, 1900);
   }
 
