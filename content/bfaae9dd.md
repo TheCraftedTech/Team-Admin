@@ -1,7 +1,5 @@
-# DAS NÄCHSTE SIGNAL
+# DER WEG ZUM SENDER
 
-Die Sternkarte ist abgespeichert – und kaum ist die Route berechnet, empfangen die Aliens ein neues, schwaches Signal.
-
-Es kommt vom **Hauser-Brunnen**. Dort muss etwas auf euch warten, das sie von hier aus nicht erkennen können.
+Auf dem Handy erscheint ein Turm. Er steht am **Hauser-Brunnen** und sieht aus wie ein Funkmast aus Metall. Das ist der Sender, mit dem ihr Sternkarte und Daten zu den Aliens im All schicken könnt.
 
 Der Weg dorthin führt über **zwei Zwischenpunkte**. Folgt dem Radar wie bisher – der erste Punkt liegt nur ein kurzes Stück entfernt.

@@ -62,6 +62,9 @@
    lädt content/8861a3f4.md. Bilder liegen im selben Ordner, ebenfalls mit Hash als Namen, und
    werden im Markdown nur mit dem Dateinamen eingebunden:  ![Beschreibung](9bde63bf.png)
    Hash-Namen anlegen:  node tools/hashify.js bild.png text.md   (kopiert die Dateien nach content/)
+   BILDER haben immer das Format 16:9 (z. B. 1280 × 720): Die Seite zeigt sie in fester Größe, anders geformte Bilder werden
+   mittig zugeschnitten. Ein Bild lässt sich einfach austauschen: die Datei in content/ mit demselben Namen überschreiben
+   (der Dateiname muss nicht zum Inhalt passen). Nach dem Austausch den Browser-Cache leeren, sonst erscheint noch das alte Bild.
    oder einen neuen Text mit festem Namen:  node tools/hashify.js --neu
    Achtung: Wer die Seite im Browser untersucht, kann alle Dateien in content/ abrufen – Hash-Namen
    verhindern nur das Erraten, keine Einsicht in steps.js.
@@ -97,7 +100,7 @@
      T30  Frage 3 von 4 (Höhe schätzen)      content/049c4674.md   fertig
      T31  Frage 4 von 4 (Galgenmännchen)     content/fe3cda9c.md   fertig
      T32  Festplatte entschlüsselt           content/59e8aa98.md   Platzhalter
-     T33  Der Aktivierungscode (Bild)        content/90ce1763.md   Platzhalter   (Bild B16: 86c5fae2.jpg, Foto der Marktweiber-Figuren)
+     T33  Der Aktivierungscode (Bild)        content/90ce1763.md   Platzhalter   (Bild B16: d6ad634b.jpg, Foto der Marktweiber-Figuren, 16:9 zugeschnitten)
      T34  Notizzettel zum Aktivierungscode   content/5edb4ab3.md   Platzhalter
      T35  Sender aktiviert: Daten gesendet   content/e9777b85.md   Platzhalter
      T36  Die Antwort kommt (zum Ohr gehen)  content/a367b120.md   Platzhalter
@@ -128,7 +131,7 @@ const SETTINGS = {
 const STEPS = [
   /* ---- Einführung ---- */
   { id: "einfuehrung", type: "info", title: "Einführung: Es geht los (T01)", md: "8861a3f4", button: "WEITER",
-    status: "platzhalter", todo: "Story-Beginn und Bild ersetzen; evtl. Lückentext ergänzen" },
+    status: "platzhalter", todo: "Entwurf prüfen (Absturz in Singen, Forschungsteam, Alien-Handy); Bild ersetzen" },
   { id: "hinweise-sicherheit", type: "info", title: "Wichtige Hinweise: Sicherheit (T10)", md: "ce0d842b", button: "VERSTANDEN",
     status: "fertig", todo: "optional: Telefonnummer des Teams ergänzen" },
   { id: "hinweise-notizen", type: "info", title: "Schmierpapier und Stift (T11)", md: "1b49aee5", button: "LOS GEHT'S",
@@ -139,11 +142,11 @@ const STEPS = [
      zwischen zwei Orten liegt jeweils mindestens ein Story-Schritt. */
   { id: "ort2", type: "locate", title: "Ort 2", lat: 47.759442881868516, lng: 8.8405967427222, status: "fertig" },
   { id: "story-1", type: "info", title: "Story 1 (T02)", md: "2bfc795f", button: "WEITER",
-    status: "platzhalter", todo: "Story-Text und Bild ersetzen" },
+    status: "platzhalter", todo: "Entwurf prüfen; Name des Kunstwerks an Ort 2 ergänzen; Bild ersetzen (Festplattenteil 1 von 6)" },
 
   { id: "ort3", type: "locate", title: "Ort 3", lat: 47.760105831192874, lng: 8.839979882181922, status: "fertig" },
   { id: "story-2", type: "info", title: "Story 2 (T03)", md: "07188df6", button: "WEITER",
-    status: "platzhalter", todo: "Story-Text und Bild ersetzen" },
+    status: "platzhalter", todo: "Entwurf prüfen; Name des Kunstwerks an Ort 3 ergänzen; Bild ersetzen (Festplattenteil 2 von 6)" },
 
   { id: "ort4", type: "locate", title: "Ort 4", lat: 47.76058112053592,  lng: 8.841501782310322, status: "fertig" },
 
@@ -162,23 +165,23 @@ const STEPS = [
   /* Nach dem Störsender kein eigener Schritt: die Meldung „abgeschaltet“ (leadMd) steht direkt über der
      jetzt lesbaren Story 3 – derselbe Text wie auf der gestörten Seite. */
   { id: "story-3-klar", type: "info", title: "Story 3, jetzt lesbar + Meldung „abgeschaltet“ (T04 + T06)", md: "609fe145", leadMd: "6c4d0427", button: "WEITER",
-    status: "platzhalter", todo: "Story-3-Text und Bild ersetzen (derselbe Text wie auf der gestörten Seite)" },
+    status: "platzhalter", todo: "Entwurf prüfen (erste Nachricht der Aliens, Festplattenteil 3 von 6); Bild ersetzen" },
 
   { id: "ort5", type: "locate", title: "Ort 5", lat: 47.76114913914456,  lng: 8.841115675526469, status: "fertig" },
   { id: "story-4", type: "info", title: "Story 4 (T07)", md: "6181fe9d", button: "WEITER",
-    status: "platzhalter", todo: "Story-Text und Bild ersetzen" },
+    status: "platzhalter", todo: "Entwurf prüfen; Name des Kunstwerks an Ort 5 ergänzen; Bild ersetzen (Festplattenteil 4 von 6)" },
 
   { id: "ort6", type: "locate", title: "Ort 6", lat: 47.76170564732148,  lng: 8.842634771566102, status: "fertig" },
   { id: "story-5", type: "info", title: "Story 5 (T08)", md: "70e24aae", button: "WEITER",
-    status: "platzhalter", todo: "Story-Text und Bild ersetzen" },
+    status: "platzhalter", todo: "Entwurf prüfen; Bild ersetzen (Festplattenteil 5 von 6); Name des Kunstwerks an Ort 6 ergänzen" },
 
   /* Ort 7: die Marktweiber (3D-Scan zur Ansicht: https://scaniverse.com/scan/neojb4zuuz3gxyua).
      Nach der Ankunft: Story, eine freie Aufgabe (eigene Dialoge erfinden), dann die Dialog-Aufgabe. */
   { id: "ort7", type: "locate", title: "Ort 7 (Marktweiber)", lat: 47.76225845637471, lng: 8.842851679977652, status: "fertig" },
   { id: "story-6", type: "info", title: "Story 6: Ankunft bei den Marktweibern (T13)", md: "a404e46e", button: "WEITER",
-    status: "platzhalter", todo: "Story-Text und Bild ersetzen" },
+    status: "platzhalter", todo: "Entwurf prüfen (erster Kontakt); Bild ersetzen" },
   { id: "story-7", type: "info", title: "Eine Aufgabe für euch: eigene Dialoge (T14)", md: "bed8f3d0", button: "WEITER",
-    status: "platzhalter", todo: "Aufgabentext und Bild prüfen/ersetzen" },
+    status: "platzhalter", todo: "Aufgabentext und Bild prüfen" },
   { id: "dialog-anleitung", type: "info", title: "Der belauschte Streit: Anleitung (T15)", md: "35e6e118", button: "ZUR AUFGABE", status: "fertig" },
 
   /* Dialog-Aufgabe: die Zeilen stehen in der RICHTIGEN Reihenfolge; angezeigt werden sie gemischt.
@@ -216,40 +219,39 @@ const STEPS = [
   /* Danach schicken die Aliens die Gruppe weiter: etwa 50 Meter nach Westen (tatsächlich ca. 43 m Luftlinie).
      Wieder ein normaler Ortungs-Schritt mit den angegebenen Koordinaten. */
   { id: "story-8", type: "info", title: "Die Aliens schicken euch weiter: 50 m nach Westen (T18)", md: "84e2cf1f", button: "WEITER",
-    status: "platzhalter", todo: "Text und Bild prüfen/ersetzen" },
-  { id: "ort8", type: "locate", title: "Ort 8 (ca. 50 m westlich der Marktweiber)", lat: 47.7622598458167, lng: 8.842276178706632, status: "fertig",
-    todo: "Koordinaten vor Ort prüfen (waren nicht ganz genau bekannt)" },
+    status: "platzhalter", todo: "Entwurf prüfen; Bild ersetzen" },
+  { id: "ort8", type: "locate", title: "Ort 8 (ca. 50 m westlich der Marktweiber)", lat: 47.7622598458167, lng: 8.842276178706632, status: "fertig" },
   /* Ankunft bei Ort 8: Dort liegt kein UFO, sondern eine veraltete Sternkarte – ein öffentliches Kunstobjekt (Relikt).
      Ablauf: Story → Karte in Ruhe ansehen (herumgehen) → Auftrag „Navigation“ → Aufgabe am Sternenhimmel → Story. */
   { id: "story-9", type: "info", title: "Eine Sternkarte: veraltetes Kunst-Relikt (T19)", md: "14a6b5ec", button: "WEITER",
-    status: "platzhalter", todo: "Text prüfen/ersetzen (Name/Beschreibung des echten Kunstobjekts einsetzen)" },
+    status: "platzhalter", todo: "Entwurf prüfen (Festplattenteil 6 von 6); Name und Beschreibung des echten Kunstobjekts einsetzen; Bild ersetzen" },
   { id: "karte-ansehen", type: "info", title: "Schaut euch die Karte an: herumgehen (T21)", md: "f5e0f468", button: "WEITER",
     status: "platzhalter", todo: "Fragen zum echten Kunstobjekt anpassen" },
   { id: "navigation-auftrag", type: "info", title: "Ihr übernehmt die Navigation: Auftrag (T22)", md: "6105ac99", button: "ZUR NAVIGATION", status: "fertig" },
   { id: "sternenhimmel", type: "sky", title: "Navigation: Route von links nach rechts planen", backTo: "navigation-auftrag", status: "fertig",
     todo: "auf echten Handys testen (Wischen/Malen, Schwierigkeit: gap, trackLength)" },
   { id: "story-10", type: "info", title: "Simulation erfolgreich (T20)", md: "413e9fcd", button: "WEITER",
-    status: "platzhalter", todo: "Text und Bild ersetzen; Geschichte weiterentwickeln" },
+    status: "platzhalter", todo: "Entwurf prüfen; Bild ersetzen" },
   /* Weg zum Hauser-Brunnen: Start (ca. 47.76214624845722 / 8.842223027645755) ist nur etwa 13 m vom Ort 8 (Sternkarte)
      entfernt, also gibt es dafür keinen eigenen Ortungs-Schritt – die Gruppe steht schon dort. Danach zwei Zwischenpunkte
      und das Ziel (Hauser-Brunnen). Zwischen jedem Ort liegt eine Story-Seite. */
   { id: "story-11", type: "info", title: "Das nächste Signal: Weg zum Hauser-Brunnen (T23)", md: "bfaae9dd", button: "WEITER",
-    status: "platzhalter", todo: "Story-Text und Bild ersetzen; Verbindung zur „letzten Frage“ in T20 klären" },
+    status: "platzhalter", todo: "Entwurf prüfen (Turm = Sender)" },
   { id: "ort9", type: "locate", title: "Ort 9 (Weg zum Hauser-Brunnen, Zwischenpunkt 1)", lat: 47.76171033989303, lng: 8.840728125758773, status: "fertig" },
   { id: "story-12", type: "info", title: "Erster Zwischenpunkt (T24)", md: "e485be82", button: "WEITER",
-    status: "platzhalter", todo: "Story-Text und Bild ersetzen; evtl. Hinweis auf den echten Ort ergänzen" },
+    status: "platzhalter", todo: "Entwurf prüfen; evtl. Hinweis auf den echten Ort ergänzen" },
   { id: "ort10", type: "locate", title: "Ort 10 (Weg zum Hauser-Brunnen, Zwischenpunkt 2)", lat: 47.761144187762625, lng: 8.84110899942255, status: "fertig" },
   { id: "story-13", type: "info", title: "Zweiter Zwischenpunkt (T25)", md: "d2792e96", button: "WEITER",
-    status: "platzhalter", todo: "Story-Text und Bild ersetzen" },
+    status: "platzhalter", todo: "Entwurf prüfen" },
   { id: "ort11", type: "locate", title: "Ort 11 (Hauser-Brunnen)", lat: 47.7606285151739, lng: 8.839440665486844, status: "fertig" },
   { id: "story-14", type: "info", title: "Ankunft am Hauser-Brunnen (T26)", md: "e4a719d8", button: "WEITER",
-    status: "platzhalter", todo: "Story-Text und Bild ersetzen; hier folgt später die Aufgabe am Brunnen" },
+    status: "platzhalter", todo: "Entwurf prüfen" },
   /* Am Hauser-Brunnen: Die Festplatte entschlüsseln. Jede Frage ist ein eigener Schritt; eine falsche Antwort führt
      zurück zu Frage 1 (failTo), die Entschlüsselung beginnt also von vorn. Die Frage nach den Stufen des Wassers
      fehlt absichtlich: im Winter ist der Brunnen abgedeckt. Bei Bedarf als weiterer password-Schritt einfügen
      (und die Nummerierung „x von 4“ in den Texten anpassen). */
   { id: "entschluesseln-anleitung", type: "info", title: "Festplatte entschlüsseln: Anleitung (T27)", md: "7e26f7d1", button: "ENTSCHLÜSSELN STARTEN",
-    status: "platzhalter", todo: "Story-Text prüfen; früher auf dem Weg Festplattenteile finden lassen (Stories 1–10)" },
+    status: "fertig" },
   { id: "frage-steine", type: "password", title: "Frage 1: Steine um den Turm (T28)", md: "e8e9df6e", placeholder: "ANZAHL", answers: ["8", "24"], button: "PRÜFEN",
     texts: { empty: "BITTE EINE ZAHL EINGEBEN", ok: "STIMMT ✔", wrong: "DAS STIMMT NICHT – ZÄHLT NOCH EINMAL" },
     status: "fertig", todo: "vor Ort prüfen: 8 oder 24 Steine" },
@@ -260,30 +262,30 @@ const STEPS = [
   { id: "frage-kuenstler", type: "hangman", title: "Frage 4: Künstler des Brunnens als Galgenmännchen (T31)", md: "fe3cda9c", word: "Erich Hauser",
     failTo: "frage-steine", status: "fertig", todo: "vor Ort prüfen: Künstlername „Erich Hauser“ (z. B. Tafel am Brunnen)" },
   { id: "entschluesselt", type: "info", title: "Festplatte entschlüsselt (T32)", md: "59e8aa98", button: "WEITER",
-    status: "platzhalter", todo: "Story fertigstellen; danach folgt der dreistellige Code" },
+    status: "fertig" },
   /* Aktivierungscode des Senders am Brunnen (nichts mit der Festplatte zu tun): ein dreistelliger Code, unendlich viele Versuche. Erste Ziffer: Anzahl der Zeichen der römischen Zahl
      aus dem Rätsel am Anfang; zweite Ziffer: Zahl, die im Rucksack versteckt ist; dritte Ziffer: Hausnummer des Gebäudes, auf
      das der Finger der Marktweiber zeigt (Hausnummer 3, auf dem Foto zu sehen). Lösung: 483. Der Zettel bleibt sichtbar. */
   { id: "code-eingabe", type: "password", title: "Aktivierungscode des Senders (T33 + T34)", md: "90ce1763", noteMd: "5edb4ab3",
     placeholder: "AKTIVIERUNGSCODE (3 ZIFFERN)", answers: ["483"], inputmode: "numeric", maxlength: 3, button: "SENDER AKTIVIEREN",
     texts: { empty: "BITTE DEN CODE EINGEBEN", ok: "SENDER AKTIVIERT ✔", wrong: "DAS IST NICHT DER CODE – PROBIERT ES NOCH EINMAL" },
-    status: "platzhalter", todo: "Code 483 steht fest; das Rätsel mit der römischen Zahl (4 Zeichen) am Anfang und die Zahl 8 im Rucksack müssen noch eingebaut werden" },
+    status: "fertig" },
   { id: "brunnen-geschafft", type: "info", title: "Sender aktiviert: Daten gesendet (T35)", md: "e9777b85", button: "WEITER",
-    status: "platzhalter", todo: "Story-Text prüfen; evtl. Bild oder kleine Sende-Animation ergänzen" },
+    status: "platzhalter", todo: "Entwurf prüfen; evtl. Bild oder kleine Sende-Animation ergänzen" },
   /* Die Antwort der Aliens: Die Gruppe geht zu einem Ort, an dem sie die Antwort HÖREN kann (ein „Ohr“, ca. 50 m vom Brunnen
      entfernt). Normaler Ortungs-Schritt; die Seite davor nennt den Ort nie als Entfernung. */
   { id: "story-15", type: "info", title: "Die Antwort kommt: zum Ohr gehen (T36)", md: "a367b120", button: "WEITER",
-    status: "platzhalter", todo: "Text prüfen; Wortlaut für das Ohr abstimmen" },
+    status: "fertig" },
   { id: "ohr", type: "locate", title: "Ort 12 (das Ohr, ca. 50 m vom Brunnen)", lat: 47.76104408397673, lng: 8.839113177063808, status: "fertig",
     todo: "vor Ort prüfen" },
   { id: "story-16", type: "info", title: "Ein Ohr für die Antwort (T37)", md: "68a0892a", button: "WEITER",
-    status: "platzhalter", todo: "Text und Bild ersetzen" },
+    status: "platzhalter", todo: "Entwurf prüfen; Bild ersetzen" },
   /* Die Aufnahme der Aliens (Platzhalter-Aufnahme, content/136cd2ad.mp3) klingt zuerst seltsam: rückwärts, zu schnell, mit
      verbogenen Tiefen und Höhen. Richtig eingestellt (Richtung umkehren, Tempo ca. ×0,63, Tiefen −9 dB, Höhen +9 dB) ist sie klar.
      Wer über das Ziel hinausdreht, wird wieder schlechter. Danach: Ende der Rallye (noch vorläufig). */
   { id: "audio-reparieren", type: "audio", title: "Die Antwort der Aliens: Aufnahme reparieren (T38)", md: "7bb26811", src: "136cd2ad.mp3",
     distort: { reverse: true, rate: 1.6, bass: 9, treble: -9 }, button: "WEITER",
-    status: "platzhalter", todo: "echte Aufnahme einsetzen (Datei mit tools/hashify.js nach content/, src anpassen); Schwierigkeit auf dem Handy testen" },
+    status: "platzhalter", todo: "echte Aufnahme einsetzen (mit tools/hashify.js nach content/ und src anpassen)" },
   { id: "ende", type: "end", title: "Ende, vorläufig (T09)", md: "0845e9c6",
-    status: "platzhalter", todo: "echtes Ende schreiben" }
+    status: "platzhalter", todo: "Ende festlegen (Audio-Auflösung, Glückwunsch, evtl. zurück zum Museum)" }
 ];
