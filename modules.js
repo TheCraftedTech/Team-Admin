@@ -512,15 +512,33 @@ registerModule("memory", (ctx) => {
    Unten schaltet ein Umschalter zwischen beiden Fassungen um. Die Sätze lassen sich am Griff ziehen
    (Zeigereingabe, auch per Finger) oder mit den Pfeilen verschieben. „PRÜFEN“ vergleicht die Reihenfolge.
    Nach maxFails falschen Versuchen hintereinander werden alle Sätze neu gemischt.
-   Felder: heading, speakers (Namen der beiden Personen), lines (in der RICHTIGEN Reihenfolge),
-           solutions (weitere erlaubte Reihenfolgen als Listen von Zeilen-Nummern ab 0), maxFails, button, backTo
+   Felder: heading, speakers (Namen der beiden Personen), showSpeakers (false = Namen ausblenden),
+           lines (in der RICHTIGEN Reihenfolge), solutions (weitere erlaubte Reihenfolgen als Listen von
+           Zeilen-Nummern ab 0), maxFails, button, backTo,
+           texts (eigene Meldungen, siehe DIALOG_TEXTS), confirmDe (eigenes Bestätigungsfenster beim Wechsel zu Deutsch)
+   Das Wechseln von Schwäbisch auf Deutsch fragt erst in einem eigenen Fenster nach; zurück geht es sofort.
    ====================================================================== */
+const DIALOG_TEXTS = {
+  failLabel: "FEHLVERSUCHE",
+  wrong: "NOCH NICHT RICHTIG – {n} VON {total} SÄTZEN STEHEN AN DER RICHTIGEN STELLE",
+  tooMany: "{max}× HINTEREINANDER FALSCH – ALLE SÄTZE WERDEN NEU GEMISCHT …",
+  reshuffled: "NEU GEMISCHT – SORTIERT DEN DIALOG NOCH EINMAL",
+  done: "DIALOG VOLLSTÄNDIG ✔"
+};
+const DIALOG_CONFIRM_DE = {
+  title: "AUF DEUTSCH WECHSELN?",
+  text: "Im Original ist der Dialog auf Schwäbisch. Auf Deutsch ist er leichter zu verstehen. Wirklich umschalten?",
+  yes: "JA, AUF DEUTSCH",
+  no: "ORIGINAL BEHALTEN"
+};
 registerModule("dialog", (ctx) => {
   const S = ctx.step;
   const lines = S.lines || [];
   const n = lines.length;
   const speakers = S.speakers || ["PERSON 1", "PERSON 2"];
   const maxFails = S.maxFails ?? 3;
+  const T = { ...DIALOG_TEXTS, ...(S.texts || {}) };
+  const fill = (tpl, vars) => tpl.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m));
   const mainOrder = lines.map((_, i) => i);
   const solutions = [mainOrder, ...(S.solutions || [])];
 
@@ -571,6 +589,7 @@ registerModule("dialog", (ctx) => {
     const handle = h("div", "dlg-handle", "⠿");
     handle.setAttribute("aria-label", "Zum Verschieben ziehen");
     const chip = h("span", "dlg-chip", speakers[line.who - 1] || `PERSON ${line.who}`);
+    chip.hidden = S.showSpeakers === false;
     const text = h("span", "dlg-text");
     const up = h("button", "", "▲"); up.type = "button"; up.setAttribute("aria-label", "Nach oben");
     const down = h("button", "", "▼"); down.type = "button"; down.setAttribute("aria-label", "Nach unten");
@@ -599,7 +618,7 @@ registerModule("dialog", (ctx) => {
   }
   function renderOrder() { list.append(...order.map((i) => nodes[i])); }
   function renderFails() {
-    failLeds.replaceChildren(h("span", "", "FEHLVERSUCHE"), ...Array.from({ length: maxFails }, (_, i) => {
+    failLeds.replaceChildren(h("span", "", T.failLabel), ...Array.from({ length: maxFails }, (_, i) => {
       const d = document.createElement("i");
       d.className = i < fails ? "on" : "";
       return d;
@@ -619,7 +638,12 @@ registerModule("dialog", (ctx) => {
 
   function setLang(next) { lang = next; renderTexts(); save(); }
   langSw.addEventListener("click", () => setLang("sw"));
-  langDe.addEventListener("click", () => setLang("de"));
+  langDe.addEventListener("click", async () => {
+    if (lang === "de") return;
+    // Von Schwäbisch auf Deutsch: erst im eigenen Fenster nachfragen (zurück geht es ohne Nachfrage)
+    const yes = await confirmBox({ ...DIALOG_CONFIRM_DE, ...(S.confirmDe || {}) });
+    if (yes) setLang("de");
+  });
 
   /* ----- Verschieben: Pfeile ----- */
   function moveBy(li, dir) {
@@ -688,7 +712,7 @@ registerModule("dialog", (ctx) => {
     save();
     nodes.forEach((li) => { li.classList.remove("ok"); });
     list.scrollTop = 0;
-    setStatus("NEU GEMISCHT – SORTIERT DEN DIALOG NOCH EINMAL");
+    setStatus(T.reshuffled);
   }
 
   function checkOrder() {
@@ -699,7 +723,7 @@ registerModule("dialog", (ctx) => {
       locked = true;
       nodes.forEach((li) => li.classList.add("ok"));
       check.disabled = true;
-      setStatus("DIALOG VOLLSTÄNDIG ✔", "ok");
+      setStatus(T.done, "ok");
       vibrateOnce();
       save();
       later(() => ctx.next(), 1400);
@@ -710,10 +734,10 @@ registerModule("dialog", (ctx) => {
     renderFails();
     if (fails >= maxFails) {
       locked = true;
-      setStatus(`${maxFails}× HINTEREINANDER FALSCH – ALLE SÄTZE WERDEN NEU GEMISCHT …`, "err");
+      setStatus(fill(T.tooMany, { max: maxFails, n: bestMatch(order), total: n }), "err");
       later(() => { locked = false; reshuffle(); }, 1900);
     } else {
-      setStatus(`NOCH NICHT RICHTIG – ${bestMatch(order)} VON ${n} SÄTZEN STEHEN AN DER RICHTIGEN STELLE`, "err");
+      setStatus(fill(T.wrong, { max: maxFails, n: bestMatch(order), total: n }), "err");
     }
     save();
   }
@@ -722,7 +746,6 @@ registerModule("dialog", (ctx) => {
   renderTexts();
   renderOrder();
   renderFails();
-  setStatus("BRINGT DIE SÄTZE IN DIE RICHTIGE REIHENFOLGE");
 
   return {
     destroy() { timers.forEach(clearTimeout); timers.clear(); clearInterval(scrollTimer); },

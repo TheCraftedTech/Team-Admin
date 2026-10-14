@@ -56,6 +56,41 @@ function matchesAnswer(input, answers) {
   return given.length > 0 && [].concat(answers || []).map(normalize).includes(given);
 }
 
+/** Eigenes Bestätigungsfenster im Stil der Seite (statt des Browser-Dialogs).
+    Gibt ein Promise zurück: true = „ja“, false = „nein“ / Esc / Tippen neben das Fenster. */
+function confirmBox({ title, text, yes = "JA", no = "ABBRECHEN" }) {
+  return new Promise((resolve) => {
+    if (document.querySelector(".modal")) { resolve(false); return; }   // es kann immer nur ein Fenster offen sein
+    const yesBtn = h("button", "go", yes);
+    yesBtn.type = "button";
+    const noBtn = h("button", "ghost", no);
+    noBtn.type = "button";
+    const titleEl = h("h2", "", title);
+    titleEl.id = "modalTitle";
+    const box = h("div", "modal-box", "", [titleEl, h("p", "", text), h("div", "modal-actions", "", [yesBtn, noBtn])]);
+    box.setAttribute("role", "dialog");
+    box.setAttribute("aria-modal", "true");
+    box.setAttribute("aria-labelledby", "modalTitle");
+    const overlay = h("div", "modal", "", [box]);
+
+    const previous = document.activeElement;
+    function close(answer) {
+      document.removeEventListener("keydown", onKey, true);
+      overlay.remove();
+      if (previous && previous.focus) previous.focus();
+      resolve(answer);
+    }
+    function onKey(e) { if (e.key === "Escape") { e.preventDefault(); close(false); } }
+    yesBtn.addEventListener("click", () => close(true));
+    noBtn.addEventListener("click", () => close(false));
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) close(false); });
+    document.addEventListener("keydown", onKey, true);
+
+    document.body.append(overlay);
+    noBtn.focus();
+  });
+}
+
 function vibrateOnce() {
   try { if (navigator.vibrate) navigator.vibrate([120, 60, 220]); } catch (e) { /* Gerät ohne Vibration */ }
 }

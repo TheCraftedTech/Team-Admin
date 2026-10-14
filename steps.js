@@ -18,7 +18,9 @@
      dialog    Dialog-Aufgabe: Sätze per Ziehen (oder Pfeile) in die richtige Reihenfolge bringen, Umschalter Schwäbisch / Deutsch.
                                                  Felder: heading, speakers[2], lines[{ who: 1|2, sw, de }] in der RICHTIGEN Reihenfolge,
                                                  solutions (weitere erlaubte Reihenfolgen als Listen von Zeilen-Nummern ab 0),
-                                                 maxFails (so oft hintereinander falsch → alles neu gemischt), button, backTo
+                                                 maxFails (so oft hintereinander falsch → alles neu gemischt), button, backTo,
+                                                 showSpeakers (false = „Marktweib 1/2“ ausblenden), texts (eigene Meldungen),
+                                                 confirmDe (eigenes Bestätigungsfenster beim Wechsel auf Deutsch)
      end       Abschlussseite.                   Felder: md
 
    Gemeinsame Felder:
@@ -51,7 +53,7 @@
      T13  Story 6 (Marktweiber, Ankunft)     content/a404e46e.md   Platzhalter   (Bild B10: 268d5d70.png)
      T14  Eine Aufgabe für euch (Dialog)     content/bed8f3d0.md   Platzhalter   (Bild B11: c35292a8.jpg)
      T15  Der belauschte Streit (Anleitung)  content/35e6e118.md   fertig
-     T16  Dialog vollständig (Gespräch)      content/e6a5e05c.md   fertig
+     T16  Aufzeichnung rekonstruiert (Gespräch) content/e6a5e05c.md   fertig
      T17  Was ist passiert? (Auflösung)      content/dd77d534.md   Platzhalter   (Bild B12: 460f8b86.png) – Audio folgt
      T09  Ende (VORLÄUFIG)                   content/0845e9c6.md   Platzhalter   (Bild B09: a6db5dd6.jpg)
 
@@ -134,12 +136,24 @@ const STEPS = [
   /* Dialog-Aufgabe: die Zeilen stehen in der RICHTIGEN Reihenfolge; angezeigt werden sie gemischt.
      Schwäbische Fassung nach Vorlage; die deutsche Fassung dient dem Umschalter. Weitere gültige Reihenfolgen
      (es gibt mehrere Lösungen) können in solutions als Listen von Zeilen-Nummern ab 0 ergänzt werden. */
-  { id: "dialog", type: "dialog", title: "Marktweiber: Dialog ordnen", heading: "DER BELAUSCHTE STREIT",
-    speakers: ["MARKTWEIB 1", "MARKTWEIB 2"], maxFails: 3, button: "PRÜFEN", backTo: "dialog-anleitung",
+  { id: "dialog", type: "dialog", title: "Marktweiber: abgehörte Aufzeichnung ordnen", heading: "ABGEHÖRTE AUFZEICHNUNG",
+    speakers: ["MARKTWEIB 1", "MARKTWEIB 2"], showSpeakers: true, maxFails: 3, button: "AUFZEICHNUNG PRÜFEN", backTo: "dialog-anleitung",
+    texts: {
+      failLabel: "STÖRUNGEN",
+      wrong: "AUFZEICHNUNG UNSTIMMIG – {n} VON {total} SÄTZEN PASSEN",
+      tooMany: "AUFZEICHNUNG ZERFÄLLT – DIE ALIENS LESEN ALLE SÄTZE NEU EIN …",
+      reshuffled: "NEU EINGELESEN – ORDNET DIE AUFZEICHNUNG NOCH EINMAL",
+      done: "AUFZEICHNUNG REKONSTRUIERT ✔"
+    },
+    confirmDe: {
+      title: "AUF DEUTSCH WECHSELN?",
+      text: "Das Original der Aufzeichnung ist auf Schwäbisch. Auf Deutsch lesen sich die Sätze leichter – aber die Aliens würden gern wissen, ob ihr auch das Original versteht. Wirklich umschalten?",
+      yes: "JA, AUF DEUTSCH",
+      no: "ORIGINAL BEHALTEN"
+    },
     solutions: [],
     lines: [
-      { who: 1, sw: "Was soll dees do?", de: "Was soll das hier?" },
-      { who: 1, sw: "Der Hund hot do gar nix verlora!", de: "Der Hund hat hier gar nichts verloren!" },
+      { who: 1, sw: "Was soll dees do? Der Hund hot do gar nix verlora!", de: "Was soll das hier? Der Hund hat hier gar nichts verloren!" },
       { who: 2, sw: "Oh, dud mir leid!", de: "Oh, tut mir leid!" },
       { who: 1, sw: "Jetz seicht der do alles voll, dees ka doch wohl ned wahr sei!", de: "Jetzt pinkelt der hier alles voll, das kann doch wohl nicht wahr sein!" },
       { who: 2, sw: "I nimm eihn ja scho mit.", de: "Ich nehme ihn ja schon mit." },
@@ -150,8 +164,7 @@ const STEPS = [
       { who: 1, sw: "Aber ganz schnell!", de: "Aber ganz schnell!" }
     ],
     status: "fertig", todo: "deutsche Fassung prüfen; weitere gültige Reihenfolgen in solutions ergänzen" },
-
-  { id: "dialog-fertig", type: "info", title: "Dialog vollständig: Gespräch darüber (T16)", md: "e6a5e05c", button: "WEITER", status: "fertig" },
+  { id: "dialog-fertig", type: "info", title: "Aufzeichnung rekonstruiert: Gespräch darüber (T16)", md: "e6a5e05c", button: "WEITER", status: "fertig" },
   { id: "aufloesung", type: "info", title: "Was ist passiert? Auflösung (T17)", md: "dd77d534", button: "WEITER",
     status: "platzhalter", todo: "Audio des Erzählers ergänzen (Audio-Modul folgt); Richtung der Frau zum Weltraum-Kunstwerk festlegen" },
 
