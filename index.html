@@ -93,7 +93,7 @@
     .md strong { color: #fff; }
     .md em { color: var(--cyan); font-style: italic; }
     .md a { color: var(--cyan); }
-    .md img { display: block; width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--green); }
+    .md img { display: block; width: 100%; height: auto; max-height: 40vh; object-fit: cover; object-position: 50% 45%; border-radius: 8px; border: 1px solid var(--green); }
     .md ul, .md ol { padding-left: 1.4em; display: flex; flex-direction: column; gap: 6px; }
     .md blockquote { padding: 10px 14px; border-left: 3px solid var(--cyan); background: rgba(0, 240, 255, 0.06); }
     .md code { font-family: inherit; background: rgba(0, 255, 102, 0.1); padding: 1px 5px; border-radius: 4px; }
@@ -179,6 +179,18 @@
     .feedback.err { color: var(--red); }
     .feedback.ok { color: var(--green); }
     .shake { animation: shake 0.4s; }
+
+    .md img { cursor: zoom-in; }
+    .lightbox { position: fixed; inset: 0; z-index: 45; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 12px; background: rgba(2, 3, 8, 0.96); animation: fadeIn 0.2s ease-out; }
+    .lightbox img { max-width: 100%; max-height: calc(100% - 40px); object-fit: contain; border-radius: 6px; }
+    .lightbox div { font-size: 11px; letter-spacing: 2px; color: var(--muted); }
+
+    /* Notizzettel (Modul „password“ mit noteMd): schräg, mit Klebestreifen */
+    .paper { position: relative; align-self: center; width: 92%; margin: 6px 0 4px; padding: 20px 18px 16px; transform: rotate(-2.4deg); background: #f3e9a8; color: #2b2410; font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Chalkboard SE", cursive; font-size: 15px; line-height: 1.55; border-radius: 3px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(0, 0, 0, 0.2); user-select: text; -webkit-user-select: text; }
+    .paper::before { content: ""; position: absolute; top: -11px; left: 50%; width: 84px; height: 22px; margin-left: -42px; transform: rotate(3deg); background: rgba(255, 255, 255, 0.35); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); }
+    .paper p, .paper ol, .paper ul { margin: 0 0 6px; }
+    .paper ol, .paper ul { padding-left: 1.3em; }
+    .paper strong { color: #7a1d1d; }
 
     /* ---------- Module „choice“ und „estimate“ ---------- */
     .opts { display: flex; flex-direction: column; gap: 10px; }

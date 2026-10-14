@@ -12,7 +12,9 @@
      password  Eingabefeld für ein Passwort.     Felder: md (Text darüber), placeholder, answers[], button
                                                  optional: failTo (id: bei falscher Antwort nach kurzer Meldung dorthin zurück,
                                                  sonst darf man es erneut versuchen), failText (eigene Meldung),
-                                                 texts ({ empty, ok, wrong }: eigene Meldungen, damit es nicht nach „Passwort“ klingt)
+                                                 texts ({ empty, ok, wrong }: eigene Meldungen, damit es nicht nach „Passwort“ klingt),
+                                                 noteMd (Notizzettel, schräg neben dem Eingabefeld, immer sichtbar),
+                                                 inputmode ("numeric" = Zifferntastatur), maxlength
      choice    Frage mit Auswahlantworten.       Felder: md (Frage, darf ein Bild enthalten), options[] (Antworten in dieser Reihenfolge),
                                                  answers[] (richtige Option(en) als Text), button, failTo, failText
      estimate  Zahl schätzen („zu groß“, „zu klein“, bei großem Abstand „viel zu …“, bis sie stimmt).
@@ -89,6 +91,9 @@
      T30  Frage 3 von 4 (Höhe schätzen)      content/049c4674.md   fertig
      T31  Frage 4 von 4 (Galgenmännchen)     content/fe3cda9c.md   fertig
      T32  Festplatte entschlüsselt           content/59e8aa98.md   Platzhalter
+     T33  Der letzte Schlüssel (Code, Bild)   content/90ce1763.md   Platzhalter   (Bild B16: 86c5fae2.jpg, Foto der Marktweiber-Figuren)
+     T34  Notizzettel zum Code               content/5edb4ab3.md   Platzhalter
+     T35  Der Code stimmt / Brunnen geschafft   content/e9777b85.md   Platzhalter
      T09  Ende (VORLÄUFIG)                   content/0845e9c6.md   Platzhalter   (Bild B09: a6db5dd6.jpg)
 
    Es gibt keine Obergrenze für Schritte: lieber jedes Detail als eigenen Schritt anlegen, dann lässt sich
@@ -247,7 +252,16 @@ const STEPS = [
     failTo: "frage-steine", status: "fertig", todo: "vor Ort prüfen: Künstlername „Erich Hauser“ (z. B. Tafel am Brunnen)" },
   { id: "entschluesselt", type: "info", title: "Festplatte entschlüsselt (T32)", md: "59e8aa98", button: "WEITER",
     status: "platzhalter", todo: "Story fertigstellen; danach folgt der dreistellige Code" },
-  /* Die Geschichte ist noch nicht zu Ende: weitere Schritte kommen zwischen „entschluesselt“ und ende.
+  /* Letzter Schlüssel: ein dreistelliger Code, unendlich viele Versuche. Erste Ziffer: Anzahl der Zeichen der römischen Zahl
+     aus dem Rätsel am Anfang; zweite Ziffer: Zahl, die im Rucksack versteckt ist; dritte Ziffer: Hausnummer des Gebäudes, auf
+     das der Finger der Marktweiber zeigt (Hausnummer 3, auf dem Foto zu sehen). Der Zettel mit den Hinweisen bleibt sichtbar. */
+  { id: "code-eingabe", type: "password", title: "Letzter Schlüssel: dreistelliger Code (T33 + T34)", md: "90ce1763", noteMd: "5edb4ab3",
+    placeholder: "CODE (3 ZIFFERN)", answers: ["123"], inputmode: "numeric", maxlength: 3, button: "CODE PRÜFEN",
+    texts: { empty: "BITTE DEN CODE EINGEBEN", ok: "CODE STIMMT ✔", wrong: "DAS IST NICHT DER CODE – PROBIERT ES NOCH EINMAL" },
+    status: "platzhalter", todo: "echten Code eintragen (1. Ziffer: römische Zahl, 2. Ziffer: Rucksack, 3. Ziffer: Hausnummer 3); Rätsel am Anfang und Rucksack-Ziffer fehlen noch" },
+  { id: "brunnen-geschafft", type: "info", title: "Der Code stimmt: Brunnen geschafft (T35)", md: "e9777b85", button: "WEITER",
+    status: "platzhalter", todo: "Story fertigstellen; hier geht die Geschichte weiter" },
+  /* Die Geschichte ist noch nicht zu Ende: weitere Schritte kommen zwischen „brunnen-geschafft“ und ende.
      Das Ende selbst ist vorläufig. */
   { id: "ende", type: "end", title: "Ende, vorläufig (T09)", md: "0845e9c6",
     status: "platzhalter", todo: "echtes Ende schreiben" }

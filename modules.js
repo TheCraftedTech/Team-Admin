@@ -5,7 +5,8 @@
              darunter (hintMd) oder einer Meldung darüber (leadMd)
    dialog    Aufgabe: Sätze eines Dialogs per Ziehen in die richtige Reihenfolge bringen, umschaltbar Schwäbisch / Deutsch
    locate    Ortungs-Radar zu einem Ort, „WEITER“ erst am Ort
-   password  Eingabefeld für ein Passwort (Text darüber aus Markdown); optional failTo: falsch → zurück zu einem Schritt
+   password  Eingabefeld für ein Passwort oder einen Code (Text darüber aus Markdown, optional ein schräger Notizzettel);
+             optional failTo: falsch → zurück zu einem Schritt
    choice    Frage mit Auswahlantworten (eine antippen, dann prüfen); optional failTo
    hangman   Galgenmännchen: einen Namen Buchstabe für Buchstabe erraten, Figur wird bei Fehlern gezeichnet
    estimate  Zahl schätzen: „zu groß / zu klein / viel zu …“, bis sie stimmt
@@ -109,6 +110,8 @@ registerModule("password", (ctx) => {
   input.setAttribute("autocorrect", "off");
   input.setAttribute("enterkeyhint", "go");
   input.setAttribute("aria-label", S.placeholder || "Passwort");
+  if (S.inputmode) input.setAttribute("inputmode", S.inputmode);
+  if (S.maxlength) input.maxLength = S.maxlength;
 
   const button = h("button", "go", S.button || "PRÜFEN");
   button.type = "submit";
@@ -123,6 +126,11 @@ registerModule("password", (ctx) => {
     const content = h("div", "md");
     parts.push(content);
     fillMarkdown(content, S.md);
+  }
+  if (S.noteMd) {
+    const paper = h("div", "paper");
+    parts.push(paper);
+    fillMarkdown(paper, S.noteMd);
   }
   parts.push(form, feedback);
 

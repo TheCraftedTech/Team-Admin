@@ -107,12 +107,33 @@ function loadContent(id) {
 }
 
 /** Füllt ein Element mit dem Inhalt zur ID; bei Fehlern steht dort die Fehlermeldung */
+/** Bild in voller Größe zeigen (Antippen schließt) – wichtig für Hinweisbilder mit kleinen Details */
+function openImage(src, alt) {
+  if (document.querySelector(".lightbox")) return;
+  const box = document.createElement("div");
+  box.className = "lightbox";
+  box.setAttribute("role", "dialog");
+  box.setAttribute("aria-label", "Bild vergrößert");
+  const img = document.createElement("img");
+  img.src = src;
+  img.alt = alt || "";
+  const hint = document.createElement("div");
+  hint.textContent = "ANTIPPEN ZUM SCHLIESSEN";
+  const close = () => { box.remove(); document.removeEventListener("keydown", onKey); };
+  const onKey = (e) => { if (e.key === "Escape") close(); };
+  box.addEventListener("click", close);
+  document.addEventListener("keydown", onKey);
+  box.append(img, hint);
+  document.body.append(box);
+}
+
 async function fillMarkdown(el, id) {
   el.classList.add("loading");
   el.textContent = "LADE …";
   try {
     el.innerHTML = markdownToHtml(await loadContent(id));
     el.classList.remove("loading");
+    el.querySelectorAll("img").forEach((img) => img.addEventListener("click", () => openImage(img.currentSrc || img.src, img.alt)));
   } catch (e) {
     el.classList.remove("loading");
     el.classList.add("error");
