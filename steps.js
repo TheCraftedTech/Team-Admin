@@ -47,8 +47,8 @@
                Tiefen und Höhen wirken sofort; passen alle Regler, erscheint „WEITER“. Läuft im Browser (Web Audio API).
                                                  Felder: md, src (Audiodatei in content/, am besten .mp3 – mit tools/hashify.js anlegen),
                                                  distort ({ reverse, rate, bass, treble }: die eingebaute Störung; die richtige Einstellung
-                                                 ist jeweils das Gegenteil, Standard { reverse: true, rate: 1.6, bass: 12, treble: -12 }),
-                                                 hint (Tipp auf Knopfdruck), button, tolRate, tolEq (erlaubte Abweichungen)
+                                                 ist jeweils das Gegenteil, Standard { reverse: true, rate: 1.6, bass: 9, treble: -9 }),
+                                                 button, tolRate, tolEq (erlaubte Abweichungen)
      end       Abschlussseite.                   Felder: md
 
    Gemeinsame Felder:
@@ -279,11 +279,11 @@ const STEPS = [
   { id: "story-16", type: "info", title: "Ein Ohr für die Antwort (T37)", md: "68a0892a", button: "WEITER",
     status: "platzhalter", todo: "Text und Bild ersetzen" },
   /* Die Aufnahme der Aliens (Platzhalter-Aufnahme, content/136cd2ad.mp3) klingt zuerst seltsam: rückwärts, zu schnell, mit
-     verbogenen Tiefen und Höhen. Richtig eingestellt (Richtung umkehren, Tempo ca. ×0,63, Tiefen −12 dB, Höhen +12 dB) ist sie klar.
-     Der Tipp spielt auf das Ohr an. Danach: Ende der Rallye (noch vorläufig). */
+     verbogenen Tiefen und Höhen. Richtig eingestellt (Richtung umkehren, Tempo ca. ×0,63, Tiefen −9 dB, Höhen +9 dB) ist sie klar.
+     Wer über das Ziel hinausdreht, wird wieder schlechter. Danach: Ende der Rallye (noch vorläufig). */
   { id: "audio-reparieren", type: "audio", title: "Die Antwort der Aliens: Aufnahme reparieren (T38)", md: "7bb26811", src: "136cd2ad.mp3",
-    distort: { reverse: true, rate: 1.6, bass: 12, treble: -12 }, hint: "Alien-Audios hört man nur mit dem linken Ohr.", button: "WEITER",
-    status: "platzhalter", todo: "echte Aufnahme einsetzen (Datei mit tools/hashify.js nach content/, src anpassen); Schwierigkeit und Tipp auf dem Handy testen" },
+    distort: { reverse: true, rate: 1.6, bass: 9, treble: -9 }, button: "WEITER",
+    status: "platzhalter", todo: "echte Aufnahme einsetzen (Datei mit tools/hashify.js nach content/, src anpassen); Schwierigkeit auf dem Handy testen" },
   { id: "ende", type: "end", title: "Ende, vorläufig (T09)", md: "0845e9c6",
     status: "platzhalter", todo: "echtes Ende schreiben" }
 ];

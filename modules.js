@@ -1837,23 +1837,24 @@ registerModule("sky", (ctx) => {
    und mit verbogenen Tiefen und Höhen. Mit RICHTUNG, TEMPO, TIEFEN und HÖHEN stellt man den Empfänger ein – alles wirkt
    sofort, auch beim Anhören, Vor- und Zurückspulen. Passen alle Regler, ist das Signal klar und „WEITER“ erscheint.
    Technik: Web Audio API (Puffer, Rückwärts-Kopie, playbackRate, zwei Equalizer-Filter) – läuft ohne Server im Browser.
+   Wer einen Regler über das Ziel hinausdreht, verschlechtert das Signal wieder (die Anzeige sinkt).
    Felder: md (Text darüber), src (Audiodatei, am besten .mp3), distort ({ reverse, rate, bass, treble }, Standard
-           { reverse: true, rate: 1.6, bass: 12, treble: -12 }), hint (Tipp, erscheint auf Knopfdruck), button,
-           tolRate (erlaubte Abweichung beim Tempo, Standard 0.08), tolEq (beim Equalizer in dB, Standard 4)
+           { reverse: true, rate: 1.6, bass: 9, treble: -9 }), button,
+           tolRate (erlaubte Abweichung beim Tempo, Standard 0.08), tolEq (beim Equalizer in dB, Standard 3)
    ====================================================================== */
 registerModule("audio", (ctx) => {
   const S = ctx.step;
-  const D = Object.assign({ reverse: true, rate: 1.6, bass: 12, treble: -12 }, S.distort);
+  const D = Object.assign({ reverse: true, rate: 1.6, bass: 9, treble: -9 }, S.distort);
   const TARGET = { reverse: D.reverse, rate: 1 / D.rate, bass: -D.bass, treble: -D.treble };
-  const TOL_RATE = S.tolRate ?? 0.08, TOL_EQ = S.tolEq ?? 4;
+  const TOL_RATE = S.tolRate ?? 0.08, TOL_EQ = S.tolEq ?? 3;
   const knobs = { reverse: false, rate: 1, bass: 0, treble: 0 };
 
   /* ----- Oberfläche ----- */
   const mkBtn = (cls, label) => { const b = h("button", cls, label); b.type = "button"; return b; };
-  const slider = (min, max, step, value, label) => {
+  const slider = (min, max, step, value, label, bipolar = false) => {
     const input = document.createElement("input");
     input.type = "range";
-    input.className = "aud-range";
+    input.className = "aud-range" + (bipolar ? " bipolar" : "");
     input.min = min; input.max = max; input.step = step; input.value = value;
     input.setAttribute("aria-label", label);
     return input;
@@ -1876,9 +1877,9 @@ registerModule("audio", (ctx) => {
 
   const dirBtn = mkBtn("aud-dir", "");
   const rateVal = h("span", "aud-val"), bassVal = h("span", "aud-val"), trebleVal = h("span", "aud-val");
-  const rateIn = slider(0.5, 2, 0.05, 1, "Tempo");
-  const bassIn = slider(-15, 15, 1, 0, "Tiefen");
-  const trebleIn = slider(-15, 15, 1, 0, "Höhen");
+  const rateIn = slider(0.4, 2, 0.05, 1, "Tempo");
+  const bassIn = slider(-15, 15, 1, 0, "Tiefen", true);
+  const trebleIn = slider(-15, 15, 1, 0, "Höhen", true);
   const row = (name, val, input) => h("label", "aud-row", "", [h("span", "aud-name", name), input, val]);
   const knobBox = h("div", "aud-knobs", "", [
     dirBtn,
@@ -1889,11 +1890,6 @@ registerModule("audio", (ctx) => {
 
   const status = h("div", "feedback");
   status.setAttribute("role", "status");
-  const tipBtn = mkBtn("ghost", "TIPP ANZEIGEN");
-  const tipText = h("div", "aud-tip");
-  tipText.hidden = true;
-  tipText.textContent = S.hint || "";
-  if (!S.hint) tipBtn.hidden = true;
   const next = mkBtn("go", S.button || "WEITER");
   next.disabled = true;
 
@@ -1903,7 +1899,7 @@ registerModule("audio", (ctx) => {
     parts.push(content);
     fillMarkdown(content, S.md);
   }
-  parts.push(h("div", "aud-panel", "", [scope, meter, transport, seekBar, timeText]), knobBox, status, tipBtn, tipText, next);
+  parts.push(h("div", "aud-sticky", "", [scope, meter]), h("div", "aud-panel", "", [transport, seekBar, timeText]), knobBox, status, next);
   const page = h("div", "page", "", parts);
   ctx.root.append(h("div", "scroller", "", [page]));
 
@@ -1999,8 +1995,8 @@ registerModule("audio", (ctx) => {
     const parts4 = [
       knobs.reverse === TARGET.reverse ? 1 : 0,
       near(Math.abs(Math.log2(knobs.rate / TARGET.rate)), Math.log2(1 + TOL_RATE / TARGET.rate), 0.6),
-      near(Math.abs(knobs.bass - TARGET.bass), TOL_EQ, 16),
-      near(Math.abs(knobs.treble - TARGET.treble), TOL_EQ, 16)
+      near(Math.abs(knobs.bass - TARGET.bass), TOL_EQ, 10),
+      near(Math.abs(knobs.treble - TARGET.treble), TOL_EQ, 10)
     ];
     const ok = parts4.every((p) => p === 1);
     return { value: parts4.reduce((a, b) => a + b, 0) / 4, ok };
@@ -2029,8 +2025,16 @@ registerModule("audio", (ctx) => {
   backBtn.addEventListener("click", () => seek(position() - 3));
   fwdBtn.addEventListener("click", () => seek(position() + 3));
   seekBar.addEventListener("input", () => seek((Number(seekBar.value) / 1000) * duration()));
-  tipBtn.addEventListener("click", () => { tipText.hidden = false; tipBtn.hidden = true; });
   next.addEventListener("click", () => ctx.next());
+
+  /** färbt die Bahn eines Reglers bis zum Griff ein (bei Tiefen/Höhen ab der Mitte) */
+  function paintRange(input) {
+    const pct = ((Number(input.value) - Number(input.min)) / (Number(input.max) - Number(input.min))) * 100;
+    const from = input.classList.contains("bipolar") ? Math.min(50, pct) : 0;
+    const to = input.classList.contains("bipolar") ? Math.max(50, pct) : pct;
+    input.style.setProperty("--a", `${from}%`);
+    input.style.setProperty("--b", `${to}%`);
+  }
 
   const sgn = (n) => (n > 0 ? "+" : "") + n;
   function refresh() {
@@ -2052,11 +2056,12 @@ registerModule("audio", (ctx) => {
     const p = position();
     timeText.textContent = `${fmt(p)} / ${fmt(duration())}`;
     if (!seekBar.matches(":active")) seekBar.value = duration() ? Math.round((p / duration()) * 1000) : 0;
+    [seekBar, rateIn, bassIn, trebleIn].forEach(paintRange);
     if (!loadFailed) {
       status.className = solved ? "feedback ok" : "feedback";
       status.textContent = !buffer ? "AUFNAHME WIRD GELADEN …"
         : solved ? "DIE ANTWORT DER ALIENS IST KLAR ZU VERSTEHEN"
-        : playing ? "STELLT DIE REGLER EIN, BIS DIE STIMME KLAR IST" : "TIPPT AUF „ANHÖREN“ UND PROBIERT DIE REGLER AUS";
+        : playing ? "STELLT DAS SIGNAL SO EIN, DASS ES KLAR WIRD" : "TIPPT AUF „ANHÖREN“ UND STELLT DAS SIGNAL EIN";
     }
   }
 
@@ -2108,7 +2113,7 @@ registerModule("audio", (ctx) => {
     info: () => ({
       type: "audio", ready: !!buffer, failed: loadFailed, playing, pos: position(), duration: duration(),
       knobs: { ...knobs }, target: { ...TARGET }, effReverse: effReverse(), effRate: effRate(),
-      quality: Math.round(quality().value * 100), solved, tipShown: !tipText.hidden
+      quality: Math.round(quality().value * 100), solved
     })
   };
 });
