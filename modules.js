@@ -755,3 +755,415 @@ registerModule("dialog", (ctx) => {
     info: () => ({ type: "dialog", lang, order: order.slice(), fails, maxFails, locked, lines: n })
   };
 });
+
+/* ======================================================================
+   Modul „sky“ – Sternenhimmel: eine Route für das Raumschiff malen
+   Ein Sternenhimmel aus mehreren Schichten: vorne bewegen sich die Sterne schneller, hinten langsamer –
+   so entsteht beim seitlichen Wischen der Eindruck von Tiefe (Parallaxe). Zwei Betriebsarten unten:
+   FLIEGEN (wischen, ziehen, Pfeiltasten oder Mausrad bewegen den Himmel) und MALEN (eine leuchtende Route
+   zeichnen; am Bildschirmrand weiterziehen, um weiterzufliegen). „ROUTE SENDEN“ lässt das Raumschiff die
+   Route abfliegen, danach geht es mit „WEITER“ oder, für die Nächsten, mit „NOCH EINMAL“ weiter.
+   Felder: backTo (Schritt-ID für „‹ ZURÜCK“), minLength (Mindestlänge der Route in Pixeln)
+   ====================================================================== */
+registerModule("sky", (ctx) => {
+  const S = ctx.step;
+  const minLength = S.minLength ?? 500;
+
+  /* ----- Oberfläche ----- */
+  const canvas = document.createElement("canvas");
+  canvas.setAttribute("aria-label", "Sternenhimmel");
+  const hint = h("div", "sky-hint");
+  hint.setAttribute("role", "status");
+  const topParts = [];
+  if (S.backTo) {
+    const back = h("button", "back", "‹ ZURÜCK");
+    back.type = "button";
+    back.addEventListener("click", () => ctx.goToId(S.backTo));
+    topParts.push(back);
+  }
+  topParts.push(hint);
+
+  const flyBtn = h("button", "", "FLIEGEN"); flyBtn.type = "button";
+  const drawBtn = h("button", "", "MALEN"); drawBtn.type = "button";
+  const modeBar = h("div", "sky-mode", "", [flyBtn, drawBtn]);
+  const againBtn = h("button", "ghost", "NOCH EINMAL"); againBtn.type = "button";
+  const sendBtn = h("button", "go", "ROUTE SENDEN"); sendBtn.type = "button";
+  const nextBtn = h("button", "go", "WEITER ›"); nextBtn.type = "button"; nextBtn.hidden = true;
+  const actions = h("div", "sky-actions", "", [againBtn, sendBtn, nextBtn]);
+
+  ctx.root.append(h("div", "sky-screen", "", [canvas, h("div", "sky-top", "", topParts), h("div", "sky-bar", "", [modeBar, actions])]));
+
+  /* ----- Zustand ----- */
+  let W = 0, H = 0, dpr = 1;
+  let cam = 0, camVel = 0, camSpeed = 0, lastCam = 0;      // Kamera (seitliche Verschiebung) und ihre Geschwindigkeit
+  let mode = "fly";                                        // fly | draw
+  let phase = "draw";                                      // draw | flying | done
+  let strokes = [];                                        // gemalte Linien, Punkte in Welt-Koordinaten { x, y }
+  let length = 0;                                          // Gesamtlänge der Route in Pixeln
+  let particles = [];
+  let shooting = null;
+  let drag = null;
+  let idle = true;                                         // solange noch nichts angefasst wurde, driftet der Himmel sanft
+  let flight = null;
+  let ufo = null;
+  let raf = 0, last = 0, uiSig = "";
+  const keys = { left: false, right: false };
+  const g = canvas.getContext("2d");
+
+  const mod = (a, n) => ((a % n) + n) % n;
+
+  /* Sternenschichten: f = Parallaxe (vorne schnell, hinten langsam), n = Anzahl, r = Größe, a = Helligkeit */
+  const LAYERS = [
+    { f: 0.12, n: 90, r: 0.7, a: 0.45 },
+    { f: 0.35, n: 70, r: 1.1, a: 0.65 },
+    { f: 0.8, n: 45, r: 1.7, a: 0.85 },
+    { f: 1.5, n: 22, r: 2.6, a: 1 }
+  ];
+  const COLORS = ["#ffffff", "#ffffff", "#9dffc4", "#00f0ff"];
+  const stars = LAYERS.map((L) => Array.from({ length: L.n }, () => ({
+    u: Math.random(), v: Math.random(), p: Math.random() * 6.28, c: COLORS[Math.floor(Math.random() * COLORS.length)]
+  })));
+  const NEBULAE = [
+    { u: 0.2, v: 0.3, r: 0.55, c: "0,255,102", a: 0.09, f: 0.05 },
+    { u: 0.7, v: 0.6, r: 0.6, c: "0,240,255", a: 0.1, f: 0.08 },
+    { u: 0.45, v: 0.85, r: 0.5, c: "150,60,255", a: 0.08, f: 0.06 }
+  ];
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = canvas.clientWidth; H = canvas.clientHeight;
+    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+  }
+  window.addEventListener("resize", resize);
+
+  /* ----- Route ----- */
+  function newStroke(p) {
+    const s = [p];
+    s.minX = p.x; s.maxX = p.x;
+    return s;
+  }
+  function addPoint(stroke, p) {
+    const q = stroke[stroke.length - 1];
+    length += Math.hypot(p.x - q.x, p.y - q.y);
+    stroke.push(p);
+    if (p.x < stroke.minX) stroke.minX = p.x;
+    if (p.x > stroke.maxX) stroke.maxX = p.x;
+  }
+  const pointCount = () => strokes.reduce((n, s) => n + s.length, 0);
+
+  function spark(x, y, power = 1) {
+    if (particles.length > 260) return;
+    const a = Math.random() * 6.28, v = (10 + Math.random() * 40) * power;
+    particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, max: 0.5 + Math.random() * 0.8, c: Math.random() < 0.5 ? "0,240,255" : "0,255,102" });
+  }
+
+  /* ----- Eingabe ----- */
+  const pt = (e) => { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+
+  canvas.addEventListener("pointerdown", (e) => {
+    if (phase !== "draw" || drag) return;
+    e.preventDefault();
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* nicht überall möglich */ }
+    const p = pt(e);
+    idle = false;
+    camVel = 0;
+    drag = { id: e.pointerId, x: p.x, y: p.y, t: performance.now(), stroke: null };
+    if (mode === "draw" && pointCount() < 4000) {
+      drag.stroke = newStroke({ x: p.x + cam, y: p.y });
+      strokes.push(drag.stroke);
+    }
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (!drag || drag.id !== e.pointerId) return;
+    const p = pt(e), now = performance.now();
+    if (mode === "fly") {
+      const dx = p.x - drag.x;
+      cam -= dx;
+      camVel = camVel * 0.6 + ((-dx / Math.max(1, now - drag.t)) * 1000) * 0.4;
+    }
+    drag.x = p.x; drag.y = p.y; drag.t = now;
+    if (mode === "draw") extendStroke();
+  });
+  const endDrag = (e) => { if (drag && drag.id === e.pointerId) { drag = null; refreshUI(); } };
+  canvas.addEventListener("pointerup", endDrag);
+  canvas.addEventListener("pointercancel", endDrag);
+  canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    idle = false;
+    cam += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+  }, { passive: false });
+
+  function onKey(e, down) {
+    const k = e.key;
+    if (k === "ArrowLeft" || k === "a" || k === "A") keys.left = down;
+    else if (k === "ArrowRight" || k === "d" || k === "D") keys.right = down;
+    else return;
+    idle = false;
+  }
+  const onKeyDown = (e) => onKey(e, true);
+  const onKeyUp = (e) => onKey(e, false);
+  window.addEventListener("keydown", onKeyDown);
+  window.addEventListener("keyup", onKeyUp);
+
+  /** Hängt dem aktuellen Strich einen Punkt an der Fingerposition an (läuft bei Bewegung und jedes Bild) */
+  function extendStroke() {
+    if (!drag || !drag.stroke) return;
+    const p = { x: drag.x + cam, y: drag.y };
+    const q = drag.stroke[drag.stroke.length - 1];
+    if (Math.hypot(p.x - q.x, p.y - q.y) > 4 && pointCount() < 4000) {
+      addPoint(drag.stroke, p);
+      spark(p.x, p.y);
+      refreshUI();
+    }
+  }
+
+  /* ----- Betriebsart und Knöpfe ----- */
+  function setMode(next) {
+    if (phase !== "draw") return;
+    mode = next;
+    idle = false;
+    refreshUI();
+  }
+  flyBtn.addEventListener("click", () => setMode("fly"));
+  drawBtn.addEventListener("click", () => setMode("draw"));
+
+  function reset() {
+    strokes = []; length = 0; particles = []; flight = null; ufo = null; drag = null;
+    phase = "draw"; mode = "draw";
+    refreshUI();
+  }
+  againBtn.addEventListener("click", reset);
+  nextBtn.addEventListener("click", () => ctx.next());
+
+  function sendRoute() {
+    if (phase !== "draw" || length < minLength) return;
+    const pts = strokes.flat();
+    const cum = [0];
+    for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
+    const total = cum[cum.length - 1];
+    flight = { pts, cum, total, t: 0, dur: clamp(total / 260, 3, 8) };
+    phase = "flying";
+    drag = null;
+    refreshUI();
+  }
+  sendBtn.addEventListener("click", sendRoute);
+
+  function sampleFlight(f, d) {
+    let i = 1;
+    while (i < f.cum.length - 1 && f.cum[i] < d) i++;
+    const a = f.pts[i - 1], b = f.pts[i], span = f.cum[i] - f.cum[i - 1] || 1;
+    const k = clamp((d - f.cum[i - 1]) / span, 0, 1);
+    return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, angle: Math.atan2(b.y - a.y, b.x - a.x) };
+  }
+
+  /** Texte und Knöpfe passend zum Zustand (nur wenn sich etwas geändert hat) */
+  function refreshUI() {
+    const ready = length >= minLength;
+    const sig = [mode, phase, ready, strokes.length].join("|");
+    if (sig === uiSig) return;
+    uiSig = sig;
+
+    flyBtn.classList.toggle("on", mode === "fly");
+    drawBtn.classList.toggle("on", mode === "draw");
+    flyBtn.disabled = drawBtn.disabled = phase !== "draw";
+    sendBtn.hidden = phase !== "draw";
+    sendBtn.disabled = !ready;
+    nextBtn.hidden = phase !== "done";
+    againBtn.disabled = phase === "flying" || (phase === "draw" && strokes.length === 0);
+
+    let text;
+    if (phase === "flying") text = "ROUTE WIRD ÜBERMITTELT …";
+    else if (phase === "done") text = "ROUTE ÜBERMITTELT – DIE KARTE DER ALIENS IST AKTUALISIERT ✔";
+    else if (mode === "fly") text = "WISCHT SEITLICH, UM DURCH DEN STERNENHIMMEL ZU FLIEGEN";
+    else if (!strokes.length) text = "MALT EINE ROUTE FÜR DAS RAUMSCHIFF – AM RAND WEITERZIEHEN, UM WEITERZUFLIEGEN";
+    else if (!ready) text = "ROUTE NOCH ZU KURZ – MALT WEITER";
+    else text = "ROUTE BEREIT – SENDEN ODER WEITERMALEN";
+    hint.textContent = text;
+  }
+
+  /* ----- Bewegung ----- */
+  function update(dt, now) {
+    // Kamera: Tasten, Auslaufen nach dem Wischen, sanftes Treiben am Anfang
+    const keyDir = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+    if (keyDir && phase !== "flying") cam += keyDir * 650 * dt;
+    if (!drag && Math.abs(camVel) > 2) { cam += camVel * dt; camVel *= Math.pow(0.05, dt); } else if (!drag) camVel = 0;
+    if (idle && phase === "draw") cam += 16 * dt;
+
+    // Malen: Punkte anhängen, am Rand weiterfliegen
+    if (drag && drag.stroke && mode === "draw") {
+      if (drag.x < 70) cam -= (70 - drag.x) * 9 * dt;
+      else if (drag.x > W - 70) cam += (drag.x - (W - 70)) * 9 * dt;
+      extendStroke();
+    }
+
+    // Flug des Raumschiffs entlang der Route; die Kamera folgt (so ziehen die Sterne vorbei)
+    if (phase === "flying" && flight) {
+      flight.t += dt;
+      const k = clamp(flight.t / flight.dur, 0, 1);
+      const eased = k * k * (3 - 2 * k);
+      ufo = sampleFlight(flight, eased * flight.total);
+      cam += (ufo.x - W * 0.4 - cam) * (1 - Math.exp(-dt * 4));
+      spark(ufo.x, ufo.y, 1.4); spark(ufo.x, ufo.y, 1.4);
+      if (k >= 1) {
+        phase = "done";
+        vibrateOnce();
+        for (let i = 0; i < 40; i++) spark(ufo.x, ufo.y, 3);
+        refreshUI();
+      }
+    }
+
+    camSpeed = camSpeed * 0.8 + ((cam - lastCam) / Math.max(dt, 0.001)) * 0.2;
+    lastCam = cam;
+
+    particles.forEach((p) => { p.life += dt; p.x += p.vx * dt; p.y += p.vy * dt; });
+    particles = particles.filter((p) => p.life < p.max);
+
+    // gelegentlich eine Sternschnuppe
+    if (!shooting && Math.random() < dt * 0.15) {
+      shooting = { x: Math.random() * W, y: Math.random() * H * 0.4, vx: 380 + Math.random() * 220, vy: 120 + Math.random() * 120, life: 0 };
+    }
+    if (shooting) { shooting.life += dt; shooting.x += shooting.vx * dt; shooting.y += shooting.vy * dt; if (shooting.life > 0.9) shooting = null; }
+
+    refreshUI();
+  }
+
+  /* ----- Zeichnen ----- */
+  function drawSky(t) {
+    const bg = g.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, "#02030c"); bg.addColorStop(1, "#050914");
+    g.fillStyle = bg;
+    g.fillRect(0, 0, W, H);
+
+    NEBULAE.forEach((n) => {
+      const x = mod(n.u * W * 1.6 - cam * n.f, W * 1.6) - W * 0.3;
+      const y = n.v * H, r = n.r * Math.max(W, H);
+      const grad = g.createRadialGradient(x, y, 0, x, y, r);
+      grad.addColorStop(0, `rgba(${n.c},${n.a})`); grad.addColorStop(1, `rgba(${n.c},0)`);
+      g.fillStyle = grad;
+      g.fillRect(0, 0, W, H);
+    });
+
+    LAYERS.forEach((L, li) => {
+      const streak = clamp(Math.abs(camSpeed) * L.f * 0.012, 0, 26);
+      stars[li].forEach((s) => {
+        const x = mod(s.u * W - cam * L.f, W);
+        const y = s.v * H;
+        const tw = 0.75 + 0.25 * Math.sin(t * 0.002 * (1 + li) + s.p);
+        g.globalAlpha = L.a * tw;
+        g.fillStyle = s.c;
+        if (streak > 2) {
+          g.strokeStyle = s.c; g.lineWidth = L.r;
+          g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.sign(camSpeed) * streak, y); g.stroke();
+        }
+        g.beginPath(); g.arc(x, y, L.r, 0, 6.283); g.fill();
+      });
+    });
+    g.globalAlpha = 1;
+
+    if (shooting) {
+      const a = 1 - shooting.life / 0.9;
+      g.strokeStyle = `rgba(255,255,255,${a})`; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(shooting.x, shooting.y); g.lineTo(shooting.x - shooting.vx * 0.12, shooting.y - shooting.vy * 0.12); g.stroke();
+    }
+  }
+
+  function drawRoute() {
+    g.lineCap = "round"; g.lineJoin = "round";
+    g.globalCompositeOperation = "lighter";
+    const passes = [[16, "rgba(0, 240, 255, 0.10)"], [7, "rgba(0, 255, 140, 0.30)"], [2.6, "rgba(235, 255, 245, 0.95)"]];
+    strokes.forEach((s) => {
+      if (s.maxX - cam < -40 || s.minX - cam > W + 40) return;
+      passes.forEach(([width, color]) => {
+        g.lineWidth = width; g.strokeStyle = color;
+        g.beginPath();
+        s.forEach((p, i) => (i ? g.lineTo(p.x - cam, p.y) : g.moveTo(p.x - cam, p.y)));
+        if (s.length === 1) g.lineTo(s[0].x - cam + 0.1, s[0].y);
+        g.stroke();
+      });
+    });
+    g.globalCompositeOperation = "source-over";
+
+    // Startpunkt der Route
+    const first = strokes[0] && strokes[0][0];
+    if (first) {
+      g.strokeStyle = "rgba(0, 240, 255, 0.9)"; g.lineWidth = 2;
+      g.beginPath(); g.arc(first.x - cam, first.y, 9, 0, 6.283); g.stroke();
+    }
+  }
+
+  function drawParticles() {
+    g.globalCompositeOperation = "lighter";
+    particles.forEach((p) => {
+      const a = 1 - p.life / p.max;
+      g.fillStyle = `rgba(${p.c},${a * 0.9})`;
+      g.beginPath(); g.arc(p.x - cam, p.y, 1.2 + a * 2, 0, 6.283); g.fill();
+    });
+    g.globalCompositeOperation = "source-over";
+  }
+
+  function drawUfo(t) {
+    if (!ufo) return;
+    const x = ufo.x - cam, y = ufo.y;
+    const glow = g.createRadialGradient(x, y, 0, x, y, 46);
+    glow.addColorStop(0, "rgba(0, 255, 140, 0.45)"); glow.addColorStop(1, "rgba(0, 255, 140, 0)");
+    g.fillStyle = glow;
+    g.fillRect(x - 46, y - 46, 92, 92);
+    g.save();
+    g.translate(x, y);
+    g.rotate(clamp(Math.sin(ufo.angle) * 0.35, -0.35, 0.35));
+    g.fillStyle = "rgba(0, 240, 255, 0.65)";
+    g.beginPath(); g.ellipse(0, -6, 10, 8, 0, Math.PI, 0); g.fill();
+    g.fillStyle = "#b9cfc7";
+    g.beginPath(); g.ellipse(0, 0, 24, 7.5, 0, 0, 6.283); g.fill();
+    g.strokeStyle = "#00ff66"; g.lineWidth = 1.5;
+    g.beginPath(); g.ellipse(0, 0, 24, 7.5, 0, 0, 6.283); g.stroke();
+    for (let i = -1; i <= 1; i++) {
+      g.fillStyle = (Math.floor(t / 180) + i) % 2 ? "#00f0ff" : "#00ff66";
+      g.beginPath(); g.arc(i * 12, 1, 2, 0, 6.283); g.fill();
+    }
+    g.restore();
+  }
+
+  function frame() {
+    raf = requestAnimationFrame(frame);
+    const t = performance.now();
+    const dt = last ? Math.min((t - last) / 1000, 0.1) : 0;
+    last = t;
+    if (!W || !H) { resize(); return; }
+    update(dt, t);
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawSky(t);
+    drawRoute();
+    drawParticles();
+    drawUfo(t);
+  }
+
+  refreshUI();
+  raf = requestAnimationFrame(frame);
+
+  return {
+    destroy() {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", resize);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    },
+    /* nur für die Debug-Seite und Tests: Zeit vorspulen (die Bewegung läuft sonst über die Bildwiederholung) */
+    debugTick(seconds = 1) {
+      for (let s = 0; s < seconds; s += 1 / 60) update(1 / 60, performance.now());
+    },
+    /* nur für die Debug-Seite: eine Beispiel-Route malen */
+    debugDraw() {
+      if (phase !== "draw") return;
+      const pts = [{ x: 60 + cam, y: H * 0.5 }];
+      strokes = [newStroke(pts[0])]; length = 0;
+      for (let x = 66; x < W * 1.9; x += 6) addPoint(strokes[0], { x: x + cam, y: H * 0.5 + Math.sin(x / 90) * H * 0.18 });
+      mode = "draw"; idle = false;
+      refreshUI();
+    },
+    info: () => ({
+      type: "sky", phase, mode, length: Math.round(length), minLength, strokes: strokes.length, cam: Math.round(cam),
+      width: W, starX: LAYERS.map((L, li) => mod(stars[li][0].u * W - cam * L.f, W))   // erste Stern je Schicht (zeigt die Parallaxe)
+    })
+  };
+});

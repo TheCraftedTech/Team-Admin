@@ -21,6 +21,9 @@
                                                  maxFails (so oft hintereinander falsch → alles neu gemischt), button, backTo,
                                                  showSpeakers (false = „Marktweib 1/2“ ausblenden), texts (eigene Meldungen),
                                                  confirmDe (eigenes Bestätigungsfenster beim Wechsel auf Deutsch)
+     sky       Sternenhimmel: seitlich wischen (Parallaxe) und eine Route für das Raumschiff malen, „ROUTE SENDEN“ lässt es sie
+               abfliegen, „NOCH EINMAL“ erlaubt eine neue Route (füllt den Bildschirm, kein Scrollen).
+                                                 Felder: backTo (id: Ziel des „‹ ZURÜCK“-Knopfs), minLength (Mindestlänge der Route in Pixeln)
      end       Abschlussseite.                   Felder: md
 
    Gemeinsame Felder:
@@ -55,7 +58,8 @@
      T15  Der belauschte Streit (Anleitung)  content/35e6e118.md   fertig
      T16  Aufzeichnung rekonstruiert (Gespräch) content/e6a5e05c.md   fertig
      T18  Aliens schicken euch weiter (Westen)  content/84e2cf1f.md   Platzhalter   (Bild B13: a9897d02.png)
-     T19  Signal gefunden (hier geht es weiter) content/14a6b5ec.md   Platzhalter   (Bild B14: 28ccfcba.jpg)
+     T19  Signal gefunden (Auftrag)          content/14a6b5ec.md   Platzhalter   (Bild B14: 28ccfcba.jpg)
+     T20  Karte aktualisiert                 content/413e9fcd.md   Platzhalter   (Bild B15: 2c931172.png)
      T09  Ende (VORLÄUFIG)                   content/0845e9c6.md   Platzhalter   (Bild B09: a6db5dd6.jpg)
 
    Es gibt keine Obergrenze für Schritte: lieber jedes Detail als eigenen Schritt anlegen, dann lässt sich
@@ -172,9 +176,14 @@ const STEPS = [
     status: "platzhalter", todo: "Text und Bild prüfen/ersetzen" },
   { id: "ort8", type: "locate", title: "Ort 8 (ca. 50 m westlich der Marktweiber)", lat: 47.7622598458167, lng: 8.842276178706632, status: "fertig",
     todo: "Koordinaten vor Ort prüfen (waren nicht ganz genau bekannt)" },
-  { id: "story-9", type: "info", title: "Signal gefunden: hier geht es weiter (T19)", md: "14a6b5ec", button: "WEITER",
-    status: "platzhalter", todo: "Geschichte weiterentwickeln; dort soll ein NFC-Tag gelesen werden (Demo: nfc.html)" },
-  /* Die Geschichte ist noch nicht zu Ende: weitere Schritte kommen zwischen story-9 und ende.
+  /* Ankunft bei Ort 8: erst Text (was ist zu tun), dann die Aufgabe am Sternenhimmel, dann wieder Text. */
+  { id: "story-9", type: "info", title: "Signal gefunden: abgestürztes UFO, Auftrag (T19)", md: "14a6b5ec", button: "ZUM STERNENHIMMEL",
+    status: "platzhalter", todo: "Text prüfen/ersetzen" },
+  { id: "sternenhimmel", type: "sky", title: "Sternenhimmel: Route für das Raumschiff malen", backTo: "story-9", minLength: 500, status: "fertig",
+    todo: "auf echten Handys testen (Wischen/Malen, Tempo)" },
+  { id: "story-10", type: "info", title: "Karte aktualisiert (T20)", md: "413e9fcd", button: "WEITER",
+    status: "platzhalter", todo: "Text und Bild ersetzen; Geschichte weiterentwickeln" },
+  /* Die Geschichte ist noch nicht zu Ende: weitere Schritte kommen zwischen story-10 und ende.
      Das Ende selbst ist vorläufig. */
   { id: "ende", type: "end", title: "Ende, vorläufig (T09)", md: "0845e9c6",
     status: "platzhalter", todo: "echtes Ende schreiben" }
