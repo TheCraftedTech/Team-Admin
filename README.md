@@ -138,7 +138,7 @@ Die Tabelle steht in der Reihenfolge der App. Sie lässt sich mit `node tools/ov
 | 48 | `story-15` | info | Die Antwort kommt: zum Ohr gehen (T36) | a367b120.md |  | fertig |
 | 49 | `ohr` | locate | Ort 12 (das Ohr, ca. 50 m vom Brunnen) |  |  | fertig |
 | 50 | `story-16` | info | Ein Ohr für die Antwort (T37) | 68a0892a.md |  | Platzhalter |
-| 51 | `audio-reparieren` | audio | Die Antwort der Aliens: Aufnahme reparieren (T38) | 7bb26811.md | 136cd2ad.mp3 | Platzhalter |
+| 51 | `audio-reparieren` | audio | Die Antwort der Aliens: Aufnahme reparieren (T38) | 7bb26811.md | 9ab34b5c.mp3 | fertig |
 | 52 | `ende` | end | Ende, vorläufig (T09) | 0845e9c6.md | a6db5dd6.jpg | Platzhalter |
 
 ## 3. Schnellstart
@@ -165,7 +165,6 @@ GPS, Kompass und Bewegungssensoren funktionieren auf dem Handy nur über **https
 | `debug.html` | **Entwicklerseite:** Die Rallye im Handy-Fenster, alle Schritte zum Springen, Fake-GPS, Hilfen für jede Aufgabe, Automatik zum Durchspielen, Anzeige der Platzhalter. |
 | `init.html` | **Berechtigungen testen:** zeigt, ob Standort, Kompass und Bewegungssensoren auf dem Handy funktionieren und fragt sie erneut ab. |
 | `reset.html` | **Fortschritt löschen** und neu beginnen. Praktisch als Lesezeichen für Tests. |
-| `ar.html` | Kleines **WebAR-Experiment** für später (gehört nicht zur Rallye). |
 
 ### Die Debug-Seite
 
@@ -196,9 +195,11 @@ tools/
   hashify.js            legt Texte/Bilder/Audio mit Hash-Namen in content/ ab
   overview.js           erzeugt die Schritt-Tabelle; --check prüft Schritte und content/
   smoke-test.js         automatischer Durchlauf der ganzen Rallye (Chrome nötig)
-debug.html  init.html  reset.html  ar.html   Hilfsseiten (siehe Abschnitt 3)
-quellen/              Originaldateien (Foto als HEIC, Aufnahme als WebM), werden von der App nicht benötigt
-Prototyp Starlight/   Greenfoot-Prototyp als Inspiration für den Sternenhimmel, nicht Teil der App
+debug.html  init.html  reset.html   Hilfsseiten (siehe Abschnitt 3)
+old/                  nicht benötigte Dateien, gehören nicht zur App:
+                        quellen/            Originale (Foto als HEIC, Aufnahme als WebM)
+                        ar.html             kleines WebAR-Experiment für später
+                        Prototyp Starlight/ Greenfoot-Prototyp, Inspiration für den Sternenhimmel
 ```
 
 Geladen wird in dieser Reihenfolge: `steps.js` → `markdown.js` → `core.js` → `modules/*.js` (siehe `index.html`).
@@ -337,7 +338,7 @@ Der **Rauchtest** prüft: jeder Schritt öffnet sich ohne Fehler, kein „Spiel�
 
 - **Bilder:** Fast alle Bilder der Story-Seiten sind Platzhalter (generierte Radar-Grafiken). Austausch siehe Abschnitt 5.
 - **Texte:** Die Story-Texte sind Entwürfe. Die Namen der Kunstwerke an Ort 2, 3, 5 und 6 fehlen noch. In der Debug-Seite sind alle Entwürfe als „Platzhalter“ markiert.
-- **Aufnahme:** Die Audio-Datei im letzten Schritt ist ein Platzhalter; die echte Antwort der Aliens muss aufgenommen werden.
+- **Aufnahme:** Die Antwort der Aliens ist eingebaut (`content/9ab34b5c.mp3`, 26 Sekunden). Schwierigkeit und Lautstärke auf dem Handy testen.
 - **Ende:** Die Abschlussseite ist vorläufig. Offen ist, wie sie genau aussieht und ob die Gruppe zum Museum zurückgeschickt wird (dafür wäre ein weiterer Ortungs-Schritt nötig).
 - **Vor Ort prüfen:** Koordinaten von Ort 8 und vom Ohr, die Antworten der Brunnen-Fragen (8 oder 24, Edelstahl, 12,0 m, Erich Hauser), die Marktweiber-Hausnummer 3.
 - **Echte Handys:** Der gesamte Ablauf, vor allem GPS, Sternenhimmel und Audio, sollte einmal draußen mit mehreren Geräten durchlaufen werden.
@@ -345,7 +346,7 @@ Der **Rauchtest** prüft: jeder Schritt öffnet sich ohne Fehler, kein „Spiel�
 
 ## 11. Ideen für später
 
-- **AR:** Das Modulsystem erlaubt es, eine AR-Aufgabe als weiteres Modul einzubauen. Ein erstes Experiment liegt in `ar.html` (WebAR mit `<model-viewer>`).
+- **AR:** Das Modulsystem erlaubt es, eine AR-Aufgabe als weiteres Modul einzubauen. Ein erstes Experiment liegt in `old/ar.html` (WebAR mit `<model-viewer>`).
 - Eine **Sende-Animation** beim Aktivieren des Senders.
 - Weitere **Nebenaufgaben** (zum Beispiel mit der Kamera) als neue Module.
 - Eine **Auswertung** am Ende (Zeit, Fehlversuche), wenn das gewünscht ist.

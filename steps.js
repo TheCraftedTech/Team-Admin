@@ -239,12 +239,12 @@ const STEPS = [
     todo: "vor Ort prüfen" },
   { id: "story-16", type: "info", title: "Ein Ohr für die Antwort (T37)", md: "68a0892a", button: "WEITER",
     status: "platzhalter", todo: "Entwurf prüfen; Bild ersetzen" },
-  /* Die Aufnahme der Aliens (Platzhalter-Aufnahme, content/136cd2ad.mp3) klingt zuerst seltsam: rückwärts, zu schnell, mit
+  /* Die Aufnahme der Aliens (content/9ab34b5c.mp3) klingt zuerst seltsam: rückwärts, zu schnell, mit
      verbogenen Tiefen und Höhen. Richtig eingestellt (Richtung umkehren, Tempo ca. ×0,63, Tiefen −9 dB, Höhen +9 dB) ist sie klar.
      Wer über das Ziel hinausdreht, wird wieder schlechter. Danach: Ende der Rallye (noch vorläufig). */
-  { id: "audio-reparieren", type: "audio", title: "Die Antwort der Aliens: Aufnahme reparieren (T38)", md: "7bb26811", src: "136cd2ad.mp3",
+  { id: "audio-reparieren", type: "audio", title: "Die Antwort der Aliens: Aufnahme reparieren (T38)", md: "7bb26811", src: "9ab34b5c.mp3",
     distort: { reverse: true, rate: 1.6, bass: 9, treble: -9 }, button: "WEITER",
-    status: "platzhalter", todo: "echte Aufnahme einsetzen (mit tools/hashify.js nach content/ und src anpassen)" },
+    status: "fertig", todo: "Schwierigkeit und Lautstärke auf dem Handy testen" },
   { id: "ende", type: "end", title: "Ende, vorläufig (T09)", md: "0845e9c6",
     status: "platzhalter", todo: "Ende festlegen (Audio-Auflösung, Glückwunsch, evtl. zurück zum Museum)" }
 ];
