@@ -11,12 +11,18 @@
                (ein Ort = ein Schritt; „WEITER“ erscheint erst, wenn man wirklich am Ort ist)
      password  Eingabefeld für ein Passwort.     Felder: md (Text darüber), placeholder, answers[], button
                                                  optional: failTo (id: bei falscher Antwort nach kurzer Meldung dorthin zurück,
-                                                 sonst darf man es erneut versuchen), failText (eigene Meldung)
+                                                 sonst darf man es erneut versuchen), failText (eigene Meldung),
+                                                 texts ({ empty, ok, wrong }: eigene Meldungen, damit es nicht nach „Passwort“ klingt)
      choice    Frage mit Auswahlantworten.       Felder: md (Frage, darf ein Bild enthalten), options[] (Antworten in dieser Reihenfolge),
                                                  answers[] (richtige Option(en) als Text), button, failTo, failText
      estimate  Zahl schätzen („zu groß“, „zu klein“, bei großem Abstand „viel zu …“, bis sie stimmt).
                                                  Felder: md, answer (richtige Zahl), unit, decimals (Nachkommastellen, Standard 1),
-                                                 farFactor (Abstand als Anteil der Lösung, ab dem „viel zu …“ gilt, Standard 0.35), placeholder, button
+                                                 farFactor (Abstand als Anteil der Lösung, ab dem „viel zu …“ gilt, Standard 0.35), placeholder, button,
+                                                 maxTries (Fehlversuche, danach wird die Lösung verraten und es geht weiter, Standard 6;
+                                                 mit failTo stattdessen zurück zu einem Schritt)
+     hangman   Galgenmännchen: einen Namen Buchstabe für Buchstabe erraten. Jeder falsche Buchstabe zeichnet ein Stück der
+               Figur (Kopf, Körper, Arme, Beine, Hände, Gesicht = 6 Fehler), danach ist es vorbei.
+                                                 Felder: md, word (gesuchter Name), failTo, failText
      memory    Aufgabe „Störsender“: Muster merken und nachtippen. EIN Code = EIN Schritt (füllt den Bildschirm, kein Scrollen).
                                                  Felder: startLabel (Start-Button), size (Raster, 5 = 5×5), dots (leuchtende Tasten),
                                                  round / rounds (nur Anzeige „CODE 2 / 3“), blinks, onMs, offMs (Blinktempo),
@@ -81,7 +87,7 @@
      T28  Frage 1 von 4 (Steine)             content/e8e9df6e.md   fertig
      T29  Frage 2 von 4 (Metall)             content/2e662bfe.md   fertig
      T30  Frage 3 von 4 (Höhe schätzen)      content/049c4674.md   fertig
-     T31  Frage 4 von 4 (Geigenmännchen)     content/fe3cda9c.md   Platzhalter   (Bild B16: 84c858c3.png, selbst gezeichnet)
+     T31  Frage 4 von 4 (Galgenmännchen)     content/fe3cda9c.md   fertig
      T32  Festplatte entschlüsselt           content/59e8aa98.md   Platzhalter
      T09  Ende (VORLÄUFIG)                   content/0845e9c6.md   Platzhalter   (Bild B09: a6db5dd6.jpg)
 
@@ -231,13 +237,14 @@ const STEPS = [
   { id: "entschluesseln-anleitung", type: "info", title: "Festplatte entschlüsseln: Anleitung (T27)", md: "7e26f7d1", button: "ENTSCHLÜSSELN STARTEN",
     status: "platzhalter", todo: "Story-Text prüfen; früher auf dem Weg Festplattenteile finden lassen (Stories 1–10)" },
   { id: "frage-steine", type: "password", title: "Frage 1: Steine um den Turm (T28)", md: "e8e9df6e", placeholder: "ANZAHL", answers: ["8", "24"], button: "PRÜFEN",
+    texts: { empty: "BITTE EINE ZAHL EINGEBEN", ok: "STIMMT ✔", wrong: "DAS STIMMT NICHT – ZÄHLT NOCH EINMAL" },
     status: "fertig", todo: "vor Ort prüfen: 8 oder 24 Steine" },
   { id: "frage-metall", type: "choice", title: "Frage 2: Metall des Turms (T29)", md: "2e662bfe", options: ["Kupfer", "Aluminium", "Edelstahl", "Messing", "Bronze", "Zink"], answers: ["Edelstahl"],
     failTo: "frage-steine", status: "fertig", todo: "vor Ort prüfen: Edelstahl; Auswahl bei Bedarf ändern" },
-  { id: "frage-hoehe", type: "estimate", title: "Frage 3: Höhe des Turms schätzen (T30)", md: "049c4674", answer: 12, unit: "m", decimals: 1, placeholder: "SCHÄTZUNG IN METERN (Z. B. 8,5)", button: "PRÜFEN",
-    status: "fertig", todo: "vor Ort prüfen: 12 m (genau 12,0; bei Bedarf Genauigkeit lockern)" },
-  { id: "frage-kuenstler", type: "choice", title: "Frage 4: Künstler des Geigenmännchens (T31)", md: "fe3cda9c", options: ["Künstler A", "Künstler B", "Künstler C", "Künstler D"], answers: ["Künstler A"],
-    failTo: "frage-steine", status: "platzhalter", todo: "echten Künstlernamen und Auswahl eintragen (Antworten sind Platzhalter)" },
+  { id: "frage-hoehe", type: "estimate", title: "Frage 3: Höhe des Turms schätzen (T30)", md: "049c4674", answer: 12, unit: "m", decimals: 1, placeholder: "SCHÄTZUNG IN METERN (Z. B. 8,5)", button: "PRÜFEN", maxTries: 6,
+    status: "fertig", todo: "vor Ort prüfen: 12 m (genau 12,0); nach 6 Versuchen wird die Höhe verraten" },
+  { id: "frage-kuenstler", type: "hangman", title: "Frage 4: Künstler des Brunnens als Galgenmännchen (T31)", md: "fe3cda9c", word: "Erich Hauser",
+    failTo: "frage-steine", status: "fertig", todo: "vor Ort prüfen: Künstlername „Erich Hauser“ (z. B. Tafel am Brunnen)" },
   { id: "entschluesselt", type: "info", title: "Festplatte entschlüsselt (T32)", md: "59e8aa98", button: "WEITER",
     status: "platzhalter", todo: "Story fertigstellen; danach folgt der dreistellige Code" },
   /* Die Geschichte ist noch nicht zu Ende: weitere Schritte kommen zwischen „entschluesselt“ und ende.
