@@ -5,7 +5,8 @@
 
      info      Text-/Bildseite zum Durchlesen.   Felder: md, button
                                                  optional: garble (0–1: Anteil „gestörter“ Zeichen, der Text ist dann nicht
-                                                 lesbar) und hintMd (kleiner Hinweiskasten darunter, z. B. die Kurz-Anleitung)
+                                                 lesbar), hintMd (Hinweiskasten darunter, z. B. die Kurz-Anleitung) und
+                                                 leadMd (kurze Meldung darüber, z. B. „Störsender abgeschaltet“)
      locate    Ortungs-Radar zu einem Ort.       Felder: lat, lng, radius, approachRadius, maxAccuracy, holdSeconds
                (ein Ort = ein Schritt; „WEITER“ erscheint erst, wenn man wirklich am Ort ist)
      password  Eingabefeld für ein Passwort.     Felder: md (Text darüber), placeholder, answers[], button
@@ -14,6 +15,10 @@
                                                  round / rounds (nur Anzeige „CODE 2 / 3“), blinks, onMs, offMs (Blinktempo),
                                                  autoStart (beginnt sofort), backTo (id: Ziel des „‹ ZURÜCK“-Knopfs),
                                                  failTo (id: bei einem Fehler dorthin springen, sonst neues Muster im selben Schritt)
+     dialog    Dialog-Aufgabe: Sätze per Ziehen (oder Pfeile) in die richtige Reihenfolge bringen, Umschalter Schwäbisch / Deutsch.
+                                                 Felder: heading, speakers[2], lines[{ who: 1|2, sw, de }] in der RICHTIGEN Reihenfolge,
+                                                 solutions (weitere erlaubte Reihenfolgen als Listen von Zeilen-Nummern ab 0),
+                                                 maxFails (so oft hintereinander falsch → alles neu gemischt), button, backTo
      end       Abschlussseite.                   Felder: md
 
    Gemeinsame Felder:
@@ -40,10 +45,14 @@
      T04  Story 3 (nach Ort 4)               content/609fe145.md   Platzhalter   (Bild B05: 1b921479.jpg) – erst gestört, nach dem Störsender lesbar
      T12  Hinweis „Signal gestört“           content/1d44835b.md   fertig
      T05  Störsender: Anleitung              content/d027c79e.md   fertig
-     T06  Störsender abgeschaltet            content/6c4d0427.md   Platzhalter   (Bild B06: 66de5a9d.png)
+     T06  Meldung „Störsender abgeschaltet“  content/6c4d0427.md   fertig        (steht als Kasten über der lesbaren Story 3)
      T07  Story 4 (nach Ort 5)               content/6181fe9d.md   Platzhalter   (Bild B07: 07d5b8c6.jpg)
      T08  Story 5 (nach Ort 6)               content/70e24aae.md   Platzhalter   (Bild B08: 41b41829.png)
-     T13  Story 6 (nach Ort 7, Marktweiber)  content/a404e46e.md   Platzhalter   (Bild B10: 268d5d70.png)
+     T13  Story 6 (Marktweiber, Ankunft)     content/a404e46e.md   Platzhalter   (Bild B10: 268d5d70.png)
+     T14  Eine Aufgabe für euch (Dialog)     content/bed8f3d0.md   Platzhalter   (Bild B11: c35292a8.jpg)
+     T15  Der belauschte Streit (Anleitung)  content/35e6e118.md   fertig
+     T16  Dialog vollständig (Gespräch)      content/e6a5e05c.md   fertig
+     T17  Was ist passiert? (Auflösung)      content/dd77d534.md   Platzhalter   (Bild B12: 460f8b86.png) – Audio folgt
      T09  Ende (VORLÄUFIG)                   content/0845e9c6.md   Platzhalter   (Bild B09: a6db5dd6.jpg)
 
    Es gibt keine Obergrenze für Schritte: lieber jedes Detail als eigenen Schritt anlegen, dann lässt sich
@@ -100,9 +109,9 @@ const STEPS = [
   { id: "stoersender-1", type: "memory", title: "Störsender: Code 1", round: 1, rounds: 3, dots: 5, startLabel: "STÖRSENDER ANGREIFEN", backTo: "stoersender-anleitung", status: "fertig" },
   { id: "stoersender-2", type: "memory", title: "Störsender: Code 2", round: 2, rounds: 3, dots: 5, autoStart: true, failTo: "stoersender-1", backTo: "stoersender-anleitung", status: "fertig" },
   { id: "stoersender-3", type: "memory", title: "Störsender: Code 3", round: 3, rounds: 3, dots: 5, autoStart: true, failTo: "stoersender-1", backTo: "stoersender-anleitung", status: "fertig" },
-  { id: "stoersender-fertig", type: "info", title: "Störsender abgeschaltet (T06)", md: "6c4d0427", button: "WEITER",
-    status: "platzhalter", todo: "echten Inhalt einsetzen: was passiert, nachdem der Störsender aus ist" },
-  { id: "story-3-klar", type: "info", title: "Story 3, jetzt lesbar (T04)", md: "609fe145", button: "WEITER",
+  /* Nach dem Störsender kein eigener Schritt: die Meldung „abgeschaltet“ (leadMd) steht direkt über der
+     jetzt lesbaren Story 3 – derselbe Text wie auf der gestörten Seite. */
+  { id: "story-3-klar", type: "info", title: "Story 3, jetzt lesbar + Meldung „abgeschaltet“ (T04 + T06)", md: "609fe145", leadMd: "6c4d0427", button: "WEITER",
     status: "platzhalter", todo: "Story-3-Text und Bild ersetzen (derselbe Text wie auf der gestörten Seite)" },
 
   { id: "ort5", type: "locate", title: "Ort 5", lat: 47.76114913914456,  lng: 8.841115675526469, status: "fertig" },
@@ -113,11 +122,40 @@ const STEPS = [
   { id: "story-5", type: "info", title: "Story 5 (T08)", md: "70e24aae", button: "WEITER",
     status: "platzhalter", todo: "Story-Text und Bild ersetzen" },
 
+  /* Ort 7: die Marktweiber (3D-Scan zur Ansicht: https://scaniverse.com/scan/neojb4zuuz3gxyua).
+     Nach der Ankunft: Story, eine freie Aufgabe (eigene Dialoge erfinden), dann die Dialog-Aufgabe. */
   { id: "ort7", type: "locate", title: "Ort 7 (Marktweiber)", lat: 47.76225845637471, lng: 8.842851679977652, status: "fertig" },
-  { id: "story-6", type: "info", title: "Story 6: hier geht es weiter (T13)", md: "a404e46e", button: "WEITER",
-    status: "platzhalter", todo: "Geschichte nach Ort 7 weiterentwickeln, weitere Schritte einfügen" },
+  { id: "story-6", type: "info", title: "Story 6: Ankunft bei den Marktweibern (T13)", md: "a404e46e", button: "WEITER",
+    status: "platzhalter", todo: "Story-Text und Bild ersetzen" },
+  { id: "story-7", type: "info", title: "Eine Aufgabe für euch: eigene Dialoge (T14)", md: "bed8f3d0", button: "WEITER",
+    status: "platzhalter", todo: "Aufgabentext und Bild prüfen/ersetzen" },
+  { id: "dialog-anleitung", type: "info", title: "Der belauschte Streit: Anleitung (T15)", md: "35e6e118", button: "ZUR AUFGABE", status: "fertig" },
 
-  /* Die Geschichte ist nach Ort 7 noch nicht zu Ende: weitere Schritte kommen zwischen story-6 und ende.
+  /* Dialog-Aufgabe: die Zeilen stehen in der RICHTIGEN Reihenfolge; angezeigt werden sie gemischt.
+     Schwäbische Fassung nach Vorlage; die deutsche Fassung dient dem Umschalter. Weitere gültige Reihenfolgen
+     (es gibt mehrere Lösungen) können in solutions als Listen von Zeilen-Nummern ab 0 ergänzt werden. */
+  { id: "dialog", type: "dialog", title: "Marktweiber: Dialog ordnen", heading: "DER BELAUSCHTE STREIT",
+    speakers: ["MARKTWEIB 1", "MARKTWEIB 2"], maxFails: 3, button: "PRÜFEN", backTo: "dialog-anleitung",
+    solutions: [],
+    lines: [
+      { who: 1, sw: "Was soll dees do?", de: "Was soll das hier?" },
+      { who: 1, sw: "Der Hund hot do gar nix verlora!", de: "Der Hund hat hier gar nichts verloren!" },
+      { who: 2, sw: "Oh, dud mir leid!", de: "Oh, tut mir leid!" },
+      { who: 1, sw: "Jetz seicht der do alles voll, dees ka doch wohl ned wahr sei!", de: "Jetzt pinkelt der hier alles voll, das kann doch wohl nicht wahr sein!" },
+      { who: 2, sw: "I nimm eihn ja scho mit.", de: "Ich nehme ihn ja schon mit." },
+      { who: 1, sw: "Do liegt überall Wierschdle ond rohs Fleisch rom!", de: "Hier liegen überall Würstchen und rohes Fleisch herum!" },
+      { who: 2, sw: "Aber i ka’n ja ned dahoam lassa.", de: "Aber ich kann ihn ja nicht zu Hause lassen." },
+      { who: 1, sw: "Der Marktplatz isch aber au koi Ort, wo Leit mit ihra Hünd gassi geha sollat!", de: "Der Marktplatz ist aber auch kein Ort, wo Leute mit ihren Hunden Gassi gehen sollten!" },
+      { who: 2, sw: "I ben ja scho weg.", de: "Ich bin ja schon weg." },
+      { who: 1, sw: "Aber ganz schnell!", de: "Aber ganz schnell!" }
+    ],
+    status: "fertig", todo: "deutsche Fassung prüfen; weitere gültige Reihenfolgen in solutions ergänzen" },
+
+  { id: "dialog-fertig", type: "info", title: "Dialog vollständig: Gespräch darüber (T16)", md: "e6a5e05c", button: "WEITER", status: "fertig" },
+  { id: "aufloesung", type: "info", title: "Was ist passiert? Auflösung (T17)", md: "dd77d534", button: "WEITER",
+    status: "platzhalter", todo: "Audio des Erzählers ergänzen (Audio-Modul folgt); Richtung der Frau zum Weltraum-Kunstwerk festlegen" },
+
+  /* Die Geschichte ist nach dem Dialog noch nicht zu Ende: weitere Schritte kommen zwischen aufloesung und ende.
      Das Ende selbst ist vorläufig. */
   { id: "ende", type: "end", title: "Ende, vorläufig (T09)", md: "0845e9c6",
     status: "platzhalter", todo: "echtes Ende schreiben" }

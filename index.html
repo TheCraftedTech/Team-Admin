@@ -106,6 +106,37 @@
     @keyframes jitter { 0% { transform: translateX(0); } 25% { transform: translateX(-2px); } 50% { transform: translateX(1px); } 75% { transform: translateX(2px); } }
     .md.hintbox { padding: 12px 14px; font-size: 14px; border: 1px solid var(--red); border-radius: 10px; background: rgba(255, 59, 92, 0.08); gap: 10px; }
     .md.hintbox strong { color: var(--red); }
+    .md.leadbox { padding: 12px 14px; font-size: 14px; border: 1px solid var(--green); border-radius: 10px; background: rgba(0, 255, 102, 0.08); }
+    .md.leadbox strong { color: var(--green); }
+
+    /* ---------- Modul „dialog“ (Sätze in die richtige Reihenfolge bringen) ---------- */
+    .dlg-screen {
+      position: fixed; inset: 0; z-index: 20; background: var(--bg); overflow: hidden;
+      display: flex; flex-direction: column; gap: 10px;
+      padding: calc(env(safe-area-inset-top) + 12px) 14px calc(env(safe-area-inset-bottom) + 14px);
+    }
+    .dlg-top { display: flex; align-items: center; gap: 12px; }
+    .dlg-title { flex: 1; text-align: center; font-size: 14px; letter-spacing: 3px; color: var(--cyan); }
+    .dlg-top .back { width: auto; padding: 9px 12px; font-size: 12px; letter-spacing: 1px; color: var(--muted); border-color: #25463a; background: transparent; }
+    .dlg-fails { display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 11px; letter-spacing: 2px; color: var(--muted); }
+    .dlg-fails i { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--red); }
+    .dlg-fails i.on { background: var(--red); box-shadow: 0 0 8px var(--red); }
+    .dlg-list { flex: 1; min-height: 0; position: relative; overflow-y: auto; -webkit-overflow-scrolling: touch; list-style: none; display: flex; flex-direction: column; gap: 8px; padding: 2px; touch-action: pan-y; }
+    .dlg-item { display: flex; align-items: stretch; gap: 8px; padding: 8px 8px 8px 4px; border: 1px solid #1d3a2d; border-left-width: 4px; border-radius: 10px; background: rgba(0, 28, 14, 0.55); }
+    .dlg-item[data-who="1"] { border-left-color: var(--green); }
+    .dlg-item[data-who="2"] { border-left-color: var(--cyan); }
+    .dlg-item.drag { position: relative; z-index: 5; background: #0b1c14; box-shadow: 0 0 18px rgba(0, 255, 102, 0.55); }
+    .dlg-item.ok { border-color: var(--green); }
+    .dlg-handle { width: 34px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 22px; color: var(--muted); cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+    .dlg-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; font-size: 14px; line-height: 1.35; color: #cfe9dd; }
+    .dlg-chip { font-size: 10px; letter-spacing: 2px; color: var(--green); }
+    .dlg-item[data-who="2"] .dlg-chip { color: var(--cyan); }
+    .dlg-move { display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+    .dlg-move button { width: 34px; height: 28px; padding: 0; border-radius: 6px; font-size: 12px; letter-spacing: 0; color: var(--muted); border-color: #25463a; background: transparent; }
+    .dlg-lang { display: flex; border: 1px solid var(--green); border-radius: 10px; overflow: hidden; }
+    .dlg-lang button { flex: 1; border: 0; border-radius: 0; background: transparent; padding: 11px 8px; font-size: 13px; letter-spacing: 2px; color: var(--muted); }
+    .dlg-lang button.on { background: rgba(0, 255, 102, 0.22); color: #fff; }
+    .dlg-screen .feedback { min-height: 2.6em; }
 
     /* ---------- Modul „password“ ---------- */
     form { display: flex; flex-direction: column; gap: 12px; }
