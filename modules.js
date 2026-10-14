@@ -757,30 +757,36 @@ registerModule("dialog", (ctx) => {
 });
 
 /* ======================================================================
-   Modul „sky“ – Sternenhimmel: eine sichere Route von links nach rechts planen
+   Modul „sky“ – Sternenhimmel: eine sichere Route von der Erde zum Heimatplaneten planen
    Ein Sternenhimmel aus mehreren Schichten (vorne bewegen sich die Sterne schneller, hinten langsamer – das
-   ergibt beim seitlichen Wischen den Eindruck von Tiefe). Die Strecke hat links einen START und rechts ein ZIEL
-   und ist an beiden Enden begrenzt. Dazwischen liegen Asteroiden und Kometen.
-   Aufgabe: eine Route vom Start zum Ziel malen.
+   ergibt beim seitlichen Wischen den Eindruck von Tiefe). Links liegt die ERDE (Start), rechts der HEIMATPLANET
+   der Aliens (Ziel); an beiden Enden ist die Strecke begrenzt. Dazwischen sind Asteroiden und Kometen zufällig
+   verstreut – es gibt immer mindestens einen freien Weg.
+   Aufgabe: eine Route von der Erde zum Heimatplaneten malen.
      - Das Raumschiff fliegt nur nach rechts, nie zurück (die Linie folgt dem Finger nur vorwärts).
      - Berührt die Linie ein Hindernis, bricht sie ab; „RÜCKGÄNGIG“ nimmt die letzten Meter zurück.
-     - Die Route muss am START beginnen und kann nur an ihrer leuchtenden Spitze weitergemalt werden.
+     - Die Route beginnt bei der Erde und lässt sich nur an ihrer leuchtenden Spitze weitermalen.
      - Am Ziel startet „SIMULATION STARTEN“ einen Probeflug (die Aliens fliegen noch nicht wirklich los).
    „NOCH EINMAL“ erzeugt eine neue Strecke für die Nächsten.
-   Betriebsarten: FLIEGEN (Himmel bewegen: wischen, Pfeiltasten, Mausrad) und MALEN (Route zeichnen;
-   am Bildschirmrand weiterziehen, um weiterzufliegen).
+   Betriebsarten: FLIEGEN (Himmel bewegen: wischen, Pfeiltasten, Mausrad) und MALEN (Route zeichnen).
+   Beim Malen scrollt der Himmel von selbst mit, sobald der Finger in das linke oder rechte Drittel kommt.
    Welt-Einheiten: die Bildschirmhöhe entspricht 1000 Einheiten, dadurch ist die Strecke auf jedem Gerät gleich.
-   Felder: backTo, trackLength (Länge in Einheiten), gap (freie Durchflugbreite), shipRadius, undoLength
+   Felder: backTo, trackLength (Länge in Einheiten), gap (freie Breite des garantierten Wegs), density (Dichte
+   der Hindernisse 0–1), shipRadius, undoLength, seed
    ====================================================================== */
 registerModule("sky", (ctx) => {
   const S = ctx.step;
-  const TRACK = S.trackLength ?? 3400;
-  const GAP = S.gap ?? 240;
+  const TRACK = S.trackLength ?? 6000;
+  const GAP = S.gap ?? 200;
+  const DENSITY = S.density ?? 0.3;
   const SHIP_R = S.shipRadius ?? 14;
   const UNDO_LEN = S.undoLength ?? 160;
-  const START_X = 90, START_ZONE = 190;      // Start: Linie bei 90, die Route muss links von 190 beginnen
-  const GOAL_X = TRACK - 90;
+  const START_X = 120, START_ZONE = 260;     // Start bei der Erde: die Route muss links von 260 beginnen
+  const GOAL_X = TRACK - 60;                 // Ziel: der Rand des Heimatplaneten
   const WORLD_H = 1000;
+  const EARTH = { x: -170, y: 520, r: 360 };
+  const HOME = { x: TRACK + 170, y: 480, r: 360 };
+  const CAM_MIN = -150;
 
   /* ----- Oberfläche ----- */
   const canvas = document.createElement("canvas");
@@ -813,7 +819,7 @@ registerModule("sky", (ctx) => {
 
   /* ----- Zustand ----- */
   let W = 0, H = 0, dpr = 1, s = 1, oy = 0;                // Bildschirm, Maßstab (Pixel je Einheit), oberer Rand des Spielfelds
-  let cam = 0, camVel = 0, camSpeed = 0, lastCamPx = 0;    // Kamera in Welt-Einheiten
+  let cam = -120, camVel = 0, camSpeed = 0, lastCamPx = 0; // Kamera in Welt-Einheiten
   let mode = "fly";                                        // fly | draw
   let phase = "draw";                                      // draw | flying | done
   let route = [];                                          // Punkte der Route (Welt-Einheiten)
@@ -831,57 +837,69 @@ registerModule("sky", (ctx) => {
 
   const mod = (a, n) => ((a % n) + n) % n;
   const unitsWide = () => W / s;
-  const clampCam = () => { cam = clamp(cam, -40, Math.max(-40, TRACK + 40 - unitsWide())); };
+  const clampCam = () => { cam = clamp(cam, CAM_MIN, Math.max(CAM_MIN, TRACK + 150 - unitsWide())); };
 
-  /* ----- Strecke mit Hindernissen ----- */
+  /* ----- Strecke mit verstreuten Hindernissen ----- */
   function rng(seed) {
     let a = seed >>> 0;
     return () => { a += 0x6D2B79F5; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
   }
 
-  /** Erzeugt Asteroiden und Kometen: Jede „Wand“ aus Hindernissen lässt eine Lücke frei, deren Mitte
-      zufällig wandert. Die Lückenmitten (gapPath) sind der garantierte Lösungsweg. */
+  const TONES = [   // Gesteinsfarben: braun, graubraun, rötlich – [hell, dunkel, Randlicht]
+    ["#7a5a40", "#2c1d13", "rgba(255, 196, 130, 0.5)"],
+    ["#645d55", "#211e1b", "rgba(225, 215, 205, 0.42)"],
+    ["#85513a", "#2d1a11", "rgba(255, 165, 115, 0.5)"]
+  ];
+
+  /** Erzeugt einen zufälligen Verlauf als garantierten Weg (corridor, nach rechts laufend) und streut Asteroiden
+      und Kometen zufällig über die Strecke – aber nie in den Weg. Der Weg ist unsichtbar; wer ihn nicht findet,
+      sucht sich einen eigenen. */
   function makeField(seed) {
     const r = rng(seed);
-    const obstacles = [];
-    const gapPath = [{ x: START_X, y: 500 }];
-    let gy = 500;
-    const add = (x, y, rad) => {
-      const comet = r() < 0.22;
-      obstacles.push({
-        x, y, r: rad, comet,
-        rot: r() * 6.28, spin: (r() - 0.5) * 0.5,
-        shape: Array.from({ length: 12 }, () => 0.82 + r() * 0.3),
-        crater: [r() * 6.28, r() * 6.28],
-        tail: 0.7 + r() * 0.5, dir: Math.PI + (r() - 0.5) * 1.2
-      });
+    // 1) Weg: zufällige Stützpunkte etwa alle 420 Einheiten, dazwischen linear
+    const ctrl = [{ x: 0, y: 500 }];
+    let cy = 500;
+    for (let x = 300; x < GOAL_X + 400; x += 380 + r() * 120) {
+      cy = clamp(cy + (r() - 0.5) * 620, 190, 810);
+      ctrl.push({ x, y: cy });
+    }
+    const corridorY = (x) => {
+      let i = 1;
+      while (i < ctrl.length - 1 && ctrl[i].x < x) i++;
+      const a = ctrl[i - 1], b = ctrl[i];
+      const k = clamp((x - a.x) / (b.x - a.x), 0, 1);
+      const e = k * k * (3 - 2 * k);            // weicher Übergang
+      return a.y + (b.y - a.y) * e;
     };
-    for (let x = 520; x < GOAL_X - 320; x += 330 + r() * 70) {
-      gy = clamp(gy + (r() - 0.5) * 360, 270, 730);
-      gapPath.push({ x, y: gy });
-      for (const dir of [-1, 1]) {                       // oben (-1) und unten (+1) bis über den Rand hinaus auffüllen
-        let edge = gy + dir * GAP / 2;
-        for (let i = 0; i < 12; i++) {
-          const rad = 55 + r() * 40;
-          const cy = edge + dir * rad * 0.8;
-          add(x + (r() - 0.5) * 50, cy, rad);
-          edge = cy + dir * rad * 0.8;
-          if ((dir < 0 && edge < -60) || (dir > 0 && edge > WORLD_H + 60)) break;
-        }
-      }
-    }
-    gapPath.push({ x: GOAL_X, y: gapPath[gapPath.length - 1].y });
+    const solution = [];
+    for (let x = 60; x <= GOAL_X + 12; x += 6) solution.push({ x, y: corridorY(x) });
 
-    // Garantierter Lösungsweg: durch die Lückenmitte, dann im freien Streifen zwischen zwei Wänden senkrecht zur nächsten Lücke
-    const solution = [{ x: 60, y: 500 }];
-    for (let k = 1; k < gapPath.length - 1; k++) {
-      const prev = gapPath[k - 1], cur = gapPath[k];
-      const mid = (prev.x + cur.x) / 2;
-      solution.push({ x: mid, y: prev.y }, { x: mid, y: cur.y }, { x: cur.x, y: cur.y });
+    // 2) Hindernisse zufällig verstreuen, aber nicht in den Weg und nicht auf die Planeten
+    const obstacles = [];
+    const nearCorridor = (x, y, rad) => {
+      for (let cx = x - rad - GAP; cx <= x + rad + GAP; cx += 12) {
+        if (Math.hypot(x - cx, y - corridorY(cx)) < rad * 0.92 + SHIP_R + GAP / 2 - 14) return true;
+      }
+      return false;
+    };
+    const xMin = START_ZONE + 180, xMax = GOAL_X - 260;
+    const targetArea = (xMax - xMin) * WORLD_H * DENSITY;
+    let area = 0;
+    for (let tries = 0; tries < 6000 && area < targetArea; tries++) {
+      const rad = 38 + r() * 62;
+      const x = xMin + r() * (xMax - xMin), y = -20 + r() * (WORLD_H + 40);
+      if (nearCorridor(x, y, rad)) continue;
+      if (obstacles.some((o) => Math.hypot(o.x - x, o.y - y) < (o.r + rad) * 0.62)) continue;     // nicht komplett aufeinander
+      area += Math.PI * rad * rad;
+      obstacles.push({
+        x, y, r: rad, comet: r() < 0.2,
+        rot: r() * 6.28, spin: (r() - 0.5) * 0.5, tone: Math.floor(r() * TONES.length),
+        shape: Array.from({ length: 13 }, () => 0.8 + r() * 0.34),
+        crater: [r() * 6.28, r() * 6.28, r() * 6.28],
+        tail: 0.7 + r() * 0.5, dir: Math.PI + (r() - 0.5) * 1.4
+      });
     }
-    const lastGap = gapPath[gapPath.length - 2];
-    solution.push({ x: (lastGap.x + GOAL_X) / 2, y: lastGap.y }, { x: GOAL_X + 10, y: lastGap.y });
-    return { seed, obstacles, gapPath, solution };
+    return { seed, obstacles, solution };
   }
   const hits = (x, y) => field.obstacles.some((o) => Math.hypot(x - o.x, y - o.y) < o.r * 0.92 + SHIP_R);
   let seedCounter = (S.seed ?? (Date.now() & 0xffff)) >>> 0;
@@ -901,6 +919,10 @@ registerModule("sky", (ctx) => {
     { u: 0.7, v: 0.6, r: 0.6, c: "0,240,255", a: 0.1, f: 0.08 },
     { u: 0.45, v: 0.85, r: 0.5, c: "150,60,255", a: 0.08, f: 0.06 }
   ];
+  // Kontinente der Erde (zufällige Flecken, einmal erzeugt)
+  const rand = rng(77);
+  const LAND = Array.from({ length: 9 }, () => ({ a: rand() * 6.28, d: 0.15 + rand() * 0.7, w: 0.12 + rand() * 0.2, h: 0.08 + rand() * 0.14, rot: rand() * 3 }));
+  const CLOUDS = Array.from({ length: 7 }, () => ({ a: rand() * 6.28, d: 0.2 + rand() * 0.7, w: 0.2 + rand() * 0.3, h: 0.04 + rand() * 0.05, rot: rand() * 3 }));
 
   /* ----- Layout: Spielfeld zwischen Hinweiszeile oben und Werkzeugleiste unten ----- */
   function resize() {
@@ -988,13 +1010,13 @@ registerModule("sky", (ctx) => {
 
     const w = toWorld(p.x, p.y);
     if (!route.length) {
-      if (w.x > START_ZONE) { flash("DIE ROUTE MUSS AM START (LINKS) BEGINNEN"); return; }
+      if (w.x > START_ZONE) { flash("DIE ROUTE MUSS BEI DER ERDE (LINKS) BEGINNEN"); return; }
       route = [{ x: clamp(w.x, 10, START_ZONE), y: clamp(w.y, 14, WORLD_H - 14) }];
       length = 0; drag.active = true;
       if (hits(route[0].x, route[0].y)) { crashed = { ...route[0] }; }
       refreshUI();
     } else if (complete) {
-      flash("ZIEL ERREICHT – SIMULATION STARTEN");
+      flash("HEIMATPLANET ERREICHT – SIMULATION STARTEN");
     } else if (crashed) {
       flash("KOLLISION! – ERST MIT „RÜCKGÄNGIG“ ZURÜCK");
     } else if (Math.hypot(w.x - route[route.length - 1].x, w.y - route[route.length - 1].y) <= 90) {
@@ -1047,7 +1069,7 @@ registerModule("sky", (ctx) => {
     seedCounter += 7919;
     field = makeField(seedCounter);
     route = []; length = 0; crashed = null; complete = false; particles = []; bursts = []; flight = null; ufo = null; drag = null;
-    phase = "draw"; mode = "draw"; cam = 0; camVel = 0;
+    phase = "draw"; mode = "draw"; cam = -120; camVel = 0;
     refreshUI();
   });
 
@@ -1057,7 +1079,7 @@ registerModule("sky", (ctx) => {
     const cum = [0];
     for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
     const total = cum[cum.length - 1];
-    flight = { pts, cum, total, t: 0, dur: clamp(total / 380, 4, 10) };
+    flight = { pts, cum, total, t: 0, dur: clamp(total / 480, 5, 14) };
     phase = "flying"; drag = null;
     refreshUI();
   });
@@ -1094,10 +1116,10 @@ registerModule("sky", (ctx) => {
     if (phase === "flying") text = "SIMULATION LÄUFT …";
     else if (phase === "done") text = "SIMULATION ERFOLGREICH – DIE ROUTE IST SICHER ✔";
     else if (crashed) text = "KOLLISION! – MIT „RÜCKGÄNGIG“ ZURÜCK UND ANDERS WEITER";
-    else if (ready) text = "ZIEL ERREICHT – SIMULATION STARTEN";
-    else if (mode === "fly") text = "WISCHT SEITLICH ÜBER DIE STRECKE – LINKS IST DER START, RECHTS DAS ZIEL";
-    else if (!route.length) text = "MALT VOM START (LINKS) ZUM ZIEL (RECHTS) – NUR NACH RECHTS, KEIN HINDERNIS BERÜHREN";
-    else text = "MALT BEI DER LEUCHTENDEN SPITZE WEITER – ZUM ZIEL RECHTS";
+    else if (ready) text = "HEIMATPLANET ERREICHT – SIMULATION STARTEN";
+    else if (mode === "fly") text = "WISCHT SEITLICH ÜBER DIE STRECKE – LINKS IST DIE ERDE, RECHTS DER HEIMATPLANET";
+    else if (!route.length) text = "MALT VON DER ERDE (LINKS) ZUM HEIMATPLANETEN (RECHTS) – NUR NACH RECHTS, KEINEN BROCKEN BERÜHREN";
+    else text = "MALT BEI DER LEUCHTENDEN SPITZE WEITER – ZUM HEIMATPLANETEN RECHTS";
     hint.textContent = flashText && performance.now() < flashUntil ? flashText : text;
   }
 
@@ -1107,10 +1129,11 @@ registerModule("sky", (ctx) => {
     if (keyDir && phase !== "flying") cam += (keyDir * 650 * dt) / s;
     if (!drag && Math.abs(camVel) > 2) { cam += camVel * dt; camVel *= Math.pow(0.05, dt); } else if (!drag) camVel = 0;
 
-    // Malen: am Rand weiterfliegen, die Spitze folgt dem Finger
+    // Malen: der Himmel scrollt schon ab dem linken/rechten Drittel mit – je näher am Rand, desto schneller
     if (drag && drag.active && mode === "draw") {
-      if (drag.x < 70) cam -= ((70 - drag.x) * 9 * dt) / s;
-      else if (drag.x > W - 70) cam += ((drag.x - (W - 70)) * 9 * dt) / s;
+      const zone = W * 0.36;
+      if (drag.x > W - zone) cam += ((drag.x - (W - zone)) * 5.5 * dt) / s;
+      else if (drag.x < zone) cam -= ((zone - drag.x) * 5.5 * dt) / s;
       clampCam();
       advanceTo(toWorld(drag.x, drag.y));
     }
@@ -1188,30 +1211,104 @@ registerModule("sky", (ctx) => {
     }
   }
 
-  /** Alles in Welt-Einheiten: Strecke, Hindernisse, Route */
+  /** Die Erde (links): blaue Kugel mit Kontinenten, Wolken und leuchtender Atmosphäre */
+  function drawEarth(t) {
+    const { x, y, r } = EARTH;
+    const halo = g.createRadialGradient(x, y, r * 0.95, x, y, r * 1.22);
+    halo.addColorStop(0, "rgba(80, 170, 255, 0.55)"); halo.addColorStop(1, "rgba(80, 170, 255, 0)");
+    g.fillStyle = halo;
+    g.beginPath(); g.arc(x, y, r * 1.22, 0, 6.283); g.fill();
+    g.save();
+    g.beginPath(); g.arc(x, y, r, 0, 6.283); g.clip();
+    const sea = g.createRadialGradient(x + r * 0.45, y - r * 0.35, r * 0.1, x, y, r);
+    sea.addColorStop(0, "#4aa8ff"); sea.addColorStop(0.55, "#1b5fb0"); sea.addColorStop(1, "#071a3a");
+    g.fillStyle = sea; g.fillRect(x - r, y - r, 2 * r, 2 * r);
+    const drift = t * 0.00002;
+    g.fillStyle = "rgba(62, 160, 90, 0.9)";
+    LAND.forEach((l) => {
+      const a = l.a + drift;
+      g.save();
+      g.translate(x + Math.cos(a) * l.d * r, y + Math.sin(a) * l.d * r);
+      g.rotate(l.rot);
+      g.beginPath(); g.ellipse(0, 0, l.w * r, l.h * r, 0, 0, 6.283); g.fill();
+      g.restore();
+    });
+    g.fillStyle = "rgba(255, 255, 255, 0.55)";
+    CLOUDS.forEach((c) => {
+      const a = c.a + drift * 1.6;
+      g.save();
+      g.translate(x + Math.cos(a) * c.d * r, y + Math.sin(a) * c.d * r);
+      g.rotate(c.rot);
+      g.beginPath(); g.ellipse(0, 0, c.w * r, c.h * r, 0, 0, 6.283); g.fill();
+      g.restore();
+    });
+    const shade = g.createRadialGradient(x + r * 0.35, y - r * 0.3, r * 0.5, x, y, r * 1.05);
+    shade.addColorStop(0, "rgba(0, 0, 0, 0)"); shade.addColorStop(1, "rgba(0, 0, 12, 0.7)");
+    g.fillStyle = shade; g.fillRect(x - r, y - r, 2 * r, 2 * r);
+    g.restore();
+    g.strokeStyle = "rgba(140, 200, 255, 0.55)"; g.lineWidth = 3;
+    g.beginPath(); g.arc(x, y, r, 0, 6.283); g.stroke();
+  }
+
+  /** Der Heimatplanet der Aliens (rechts): leuchtend violett-grün mit Ring */
+  function drawHome(t) {
+    const { x, y, r } = HOME;
+    const ring = (front) => {
+      g.save();
+      g.translate(x, y); g.rotate(-0.28);
+      g.strokeStyle = "rgba(0, 255, 160, 0.55)"; g.lineWidth = 18;
+      g.beginPath(); g.ellipse(0, 0, r * 1.55, r * 0.42, 0, front ? 0 : Math.PI, front ? Math.PI : 6.283); g.stroke();
+      g.strokeStyle = "rgba(0, 240, 255, 0.5)"; g.lineWidth = 5;
+      g.beginPath(); g.ellipse(0, 0, r * 1.7, r * 0.47, 0, front ? 0 : Math.PI, front ? Math.PI : 6.283); g.stroke();
+      g.restore();
+    };
+    const halo = g.createRadialGradient(x, y, r * 0.95, x, y, r * 1.3);
+    halo.addColorStop(0, "rgba(0, 255, 140, 0.5)"); halo.addColorStop(1, "rgba(0, 255, 140, 0)");
+    g.fillStyle = halo;
+    g.beginPath(); g.arc(x, y, r * 1.3, 0, 6.283); g.fill();
+    ring(false);
+    g.save();
+    g.beginPath(); g.arc(x, y, r, 0, 6.283); g.clip();
+    const body = g.createRadialGradient(x - r * 0.4, y - r * 0.3, r * 0.1, x, y, r);
+    body.addColorStop(0, "#a45cff"); body.addColorStop(0.5, "#4a1d9a"); body.addColorStop(1, "#150a3a");
+    g.fillStyle = body; g.fillRect(x - r, y - r, 2 * r, 2 * r);
+    g.fillStyle = "rgba(0, 255, 170, 0.22)";
+    for (let i = 0; i < 6; i++) {
+      g.beginPath(); g.ellipse(x - r * 0.1 + Math.sin(t * 0.0002 + i) * 14, y + (i - 2.5) * r * 0.26, r * 1.1, r * 0.06, -0.28, 0, 6.283); g.fill();
+    }
+    for (let i = 0; i < 12; i++) {                     // Lichter der Städte
+      g.fillStyle = `rgba(150, 255, 220, ${0.35 + 0.35 * Math.sin(t * 0.003 + i * 2)})`;
+      g.beginPath(); g.arc(x - r * (0.2 + (i * 37 % 60) / 100), y + ((i * 53) % 90 - 45) / 100 * r, 4, 0, 6.283); g.fill();
+    }
+    const shade = g.createRadialGradient(x - r * 0.35, y - r * 0.3, r * 0.5, x, y, r * 1.05);
+    shade.addColorStop(0, "rgba(0, 0, 0, 0)"); shade.addColorStop(1, "rgba(0, 0, 14, 0.65)");
+    g.fillStyle = shade; g.fillRect(x - r, y - r, 2 * r, 2 * r);
+    g.restore();
+    g.strokeStyle = "rgba(0, 255, 160, 0.7)"; g.lineWidth = 3;
+    g.beginPath(); g.arc(x, y, r, 0, 6.283); g.stroke();
+    ring(true);
+  }
+
+  /** Alles in Welt-Einheiten: Planeten, Hindernisse, Route */
   function drawWorld(t) {
     g.setTransform(dpr * s, 0, 0, dpr * s, -cam * s * dpr, oy * dpr);
 
-    // Bereiche außerhalb der Strecke abdunkeln (Begrenzung links und rechts)
-    g.fillStyle = "rgba(2, 3, 10, 0.78)";
-    const vTop = -oy / s, vH = H / s;
-    if (cam < 0) g.fillRect(cam, vTop, -cam, vH);
-    if (cam + unitsWide() > TRACK) g.fillRect(TRACK, vTop, cam + unitsWide() - TRACK, vH);
+    if (cam < EARTH.x + EARTH.r + 200) drawEarth(t);
+    if (cam + unitsWide() > HOME.x - HOME.r * 1.8) drawHome(t);
 
-    // Start- und Ziellinie
+    // Startfeld bei der Erde und Zielrand beim Heimatplaneten
     g.lineWidth = 3; g.setLineDash([14, 12]);
-    g.strokeStyle = "rgba(0, 255, 102, 0.8)";
+    g.strokeStyle = "rgba(0, 255, 102, 0.55)";
     g.beginPath(); g.moveTo(START_X, 0); g.lineTo(START_X, WORLD_H); g.stroke();
-    g.strokeStyle = complete ? "rgba(0, 255, 102, 1)" : "rgba(0, 240, 255, 0.8)";
+    g.strokeStyle = complete ? "rgba(0, 255, 102, 0.95)" : "rgba(0, 240, 255, 0.55)";
     g.beginPath(); g.moveTo(GOAL_X, 0); g.lineTo(GOAL_X, WORLD_H); g.stroke();
     g.setLineDash([]);
-    g.fillStyle = "rgba(0, 255, 102, 0.07)"; g.fillRect(START_X, 0, START_ZONE - START_X, WORLD_H);
-    g.fillStyle = "rgba(0, 240, 255, 0.07)"; g.fillRect(GOAL_X, 0, TRACK - GOAL_X, WORLD_H);
+    g.fillStyle = "rgba(0, 255, 102, 0.06)"; g.fillRect(START_X, 0, START_ZONE - START_X, WORLD_H);
     g.font = "bold 30px 'Courier New', monospace"; g.textAlign = "center"; g.textBaseline = "middle";
-    g.fillStyle = "rgba(0, 255, 102, 0.9)"; g.fillText("START", START_X + 50, 40);
-    g.fillStyle = "rgba(0, 240, 255, 0.9)"; g.fillText("ZIEL", GOAL_X + 45, 40);
+    g.fillStyle = "rgba(0, 255, 102, 0.95)"; g.fillText("ERDE", START_X + 70, 40);
+    g.fillStyle = "rgba(0, 240, 255, 0.95)"; g.fillText("HEIMATPLANET", GOAL_X - 190, 40);
     g.font = "bold 44px 'Courier New', monospace";
-    g.fillText("▶", START_X + 48, WORLD_H / 2 - 4);
+    g.fillStyle = "rgba(0, 255, 102, 0.9)"; g.fillText("▶", START_X + 70, WORLD_H / 2 - 4);
 
     // Hindernisse
     const x0 = cam - 200, x1 = cam + unitsWide() + 200;
@@ -1246,10 +1343,10 @@ registerModule("sky", (ctx) => {
       g.strokeStyle = crashed ? "rgba(255, 59, 92, 0.9)" : "rgba(0, 240, 255, 0.8)"; g.lineWidth = 3;
       g.beginPath(); g.arc(head.x, head.y, 22 + 5 * pulse, 0, 6.283); g.stroke();
     }
-    // Start der Route
+    // Startmarke, solange noch keine Route da ist
     if (!route.length && phase === "draw" && mode === "draw") {
       g.strokeStyle = "rgba(0, 255, 102, 0.9)"; g.lineWidth = 3; g.setLineDash([10, 8]);
-      g.beginPath(); g.arc(START_X + 50, WORLD_H / 2, 60, 0, 6.283); g.stroke(); g.setLineDash([]);
+      g.beginPath(); g.arc(START_X + 70, WORLD_H / 2, 62, 0, 6.283); g.stroke(); g.setLineDash([]);
     }
 
     // Funken und Aufschläge
@@ -1270,6 +1367,7 @@ registerModule("sky", (ctx) => {
   }
 
   function drawRock(o, t) {
+    const [light, dark, rim] = TONES[o.tone];
     g.save();
     g.translate(o.x, o.y);
     g.rotate(o.rot + t * 0.0001 * o.spin);
@@ -1279,12 +1377,15 @@ registerModule("sky", (ctx) => {
       i ? g.lineTo(Math.cos(a) * o.r * k, Math.sin(a) * o.r * k) : g.moveTo(Math.cos(a) * o.r * k, Math.sin(a) * o.r * k);
     });
     g.closePath();
-    const grad = g.createRadialGradient(-o.r * 0.3, -o.r * 0.3, o.r * 0.1, 0, 0, o.r);
-    grad.addColorStop(0, "#2a3b36"); grad.addColorStop(1, "#0d1714");
+    const grad = g.createRadialGradient(-o.r * 0.35, -o.r * 0.35, o.r * 0.1, 0, 0, o.r * 1.05);
+    grad.addColorStop(0, light); grad.addColorStop(1, dark);
     g.fillStyle = grad; g.fill();
-    g.strokeStyle = "rgba(0, 255, 102, 0.55)"; g.lineWidth = 3; g.stroke();
-    g.fillStyle = "rgba(0, 0, 0, 0.35)";
-    o.crater.forEach((a, i) => { g.beginPath(); g.arc(Math.cos(a) * o.r * 0.35, Math.sin(a) * o.r * 0.35, o.r * (0.14 + i * 0.05), 0, 6.283); g.fill(); });
+    g.strokeStyle = rim; g.lineWidth = 2.4; g.stroke();
+    o.crater.forEach((a, i) => {
+      const cx = Math.cos(a) * o.r * 0.38, cy = Math.sin(a) * o.r * 0.38, cr = o.r * (0.12 + i * 0.04);
+      g.fillStyle = "rgba(0, 0, 0, 0.32)"; g.beginPath(); g.arc(cx, cy, cr, 0, 6.283); g.fill();
+      g.strokeStyle = "rgba(255, 220, 180, 0.16)"; g.lineWidth = 1.6; g.beginPath(); g.arc(cx - cr * 0.12, cy - cr * 0.12, cr, 0.2, 2.6); g.stroke();
+    });
     g.restore();
   }
 
@@ -1351,7 +1452,8 @@ registerModule("sky", (ctx) => {
     /* nur für die Debug-Seite und Tests */
     debugTick(seconds = 1) { for (let t = 0; t < seconds; t += 1 / 60) update(1 / 60); },
     debugScreen: (wx, wy) => toScreen(wx, wy),
-    /** malt eine gültige Route (den garantierten Lösungsweg) vom Start bis zum Ziel */
+    debugObstacles: () => field.obstacles.map((o) => ({ x: o.x, y: o.y, r: o.r, comet: o.comet })),
+    /** malt eine gültige Route (den garantierten Weg) von der Erde bis zum Heimatplaneten */
     debugDraw() {
       if (phase !== "draw") return;
       route = [{ x: 60, y: 500 }]; length = 0; crashed = null; complete = false; flashText = "";
@@ -1359,26 +1461,23 @@ registerModule("sky", (ctx) => {
       field.solution.forEach((p) => advanceTo(p));
       refreshUI();
     },
-    /** fährt geradeaus in das erste Hindernis (zum Testen der Kollision) */
+    /** steuert geradewegs in ein Hindernis (zum Testen der Kollision) */
     debugCrash() {
       if (phase !== "draw") return;
-      route = [{ x: 60, y: 500 }]; length = 0; crashed = null; complete = false;
+      route = [{ x: 60, y: 500 }]; length = 0; crashed = null; complete = false; flashText = "";
       mode = "draw";
-      const target = field.obstacles.filter((o) => Math.abs(o.y - 500) < 140).sort((a, b) => a.x - b.x)[0] || field.obstacles[0];
-      advanceTo({ x: target.x + target.r + 40, y: target.y });
+      const target = field.obstacles.filter((o) => Math.abs(o.y - 500) < 260).sort((a, b) => a.x - b.x)[0] || field.obstacles[0];
+      advanceTo({ x: target.x, y: target.y });
       refreshUI();
     },
-    /** prüft für viele Startwerte, dass der Lösungsweg lückenlos frei von Hindernissen ist (Anzahl der Fehler) */
+    /** prüft für viele Startwerte, dass der garantierte Weg frei von Hindernissen ist (Anzahl der Fehler) und die Strecke gefüllt ist */
     debugCheckFields(count = 100) {
       let bad = 0;
       const keep = field;
       for (let i = 0; i < count && !bad; i++) {
         field = makeField(1000 + i * 31);
-        for (let k = 1; k < field.solution.length && !bad; k++) {
-          const a = field.solution[k - 1], b = field.solution[k];
-          const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 4));
-          for (let j = 0; j <= n; j++) if (hits(a.x + ((b.x - a.x) * j) / n, a.y + ((b.y - a.y) * j) / n)) { bad++; break; }
-        }
+        if (field.obstacles.length < 25) bad++;
+        for (const p of field.solution) if (hits(p.x, p.y)) { bad++; break; }
       }
       field = keep;
       return bad;
@@ -1387,7 +1486,7 @@ registerModule("sky", (ctx) => {
       type: "sky", phase, mode, length: Math.round(length), complete, crashed: !!crashed,
       head: route.length ? route[route.length - 1] : null, routePoints: route.length,
       cam: Math.round(cam), width: W, scale: s, track: TRACK, startX: START_X, startZone: START_ZONE, goalX: GOAL_X,
-      obstacles: field.obstacles.length, seed: field.seed, gapPath: field.gapPath,
+      obstacles: field.obstacles.length, seed: field.seed,
       starX: LAYERS.map((L, li) => mod(stars[li][0].u * W - cam * s * L.f, W))
     })
   };

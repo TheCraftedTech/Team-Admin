@@ -21,11 +21,13 @@
                                                  maxFails (so oft hintereinander falsch → alles neu gemischt), button, backTo,
                                                  showSpeakers (false = „Marktweib 1/2“ ausblenden), texts (eigene Meldungen),
                                                  confirmDe (eigenes Bestätigungsfenster beim Wechsel auf Deutsch)
-     sky       Navigations-Aufgabe am Sternenhimmel: eine Route von links (Start) nach rechts (Ziel) malen, vorbei an Kometen
-               und Asteroiden; das Raumschiff fliegt nur nach rechts, Berührung bricht die Linie ab, „RÜCKGÄNGIG“/„LÖSCHEN“,
-               am Ziel „SIMULATION STARTEN“, „NOCH EINMAL“ erzeugt eine neue Strecke (füllt den Bildschirm, kein Scrollen).
-                                                 Felder: backTo (id: Ziel des „‹ ZURÜCK“-Knopfs), trackLength (Länge der Strecke, Standard 3400),
-                                                 gap (freie Durchflugbreite, Standard 240 – kleiner = schwerer), shipRadius, undoLength, seed
+     sky       Navigations-Aufgabe am Sternenhimmel: eine Route von der Erde (links) zum Heimatplaneten der Aliens (rechts)
+               malen, vorbei an zufällig verstreuten Kometen und Asteroiden; das Raumschiff fliegt nur nach rechts, Berührung
+               bricht die Linie ab, „RÜCKGÄNGIG“/„LÖSCHEN“, am Ziel „SIMULATION STARTEN“, „NOCH EINMAL“ erzeugt eine neue
+               Strecke (füllt den Bildschirm, kein Scrollen).
+                                                 Felder: backTo (id: Ziel des „‹ ZURÜCK“-Knopfs), trackLength (Länge der Strecke, Standard 6000),
+                                                 gap (Breite des garantiert freien Wegs, Standard 200 – kleiner = schwerer),
+                                                 density (Dichte der Hindernisse 0–1, Standard 0.3), shipRadius, undoLength, seed
      end       Abschlussseite.                   Felder: md
 
    Gemeinsame Felder:
