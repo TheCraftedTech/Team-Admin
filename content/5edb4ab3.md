@@ -1,5 +1,5 @@
-**Gesucht: drei Ziffern**
+**Code – meine Notizen**
 
-1. Wie viele Zeichen hat die Zahl der alten Römer vom Anfang?
-2. Die Zahl, die ihr auf dem Rücken tragt.
-3. Die Zahl, auf die der Finger zeigt.
+- zuerst: Anzahl der Zeichen der Römerzahl
+- dann: die Zahl, die wir mit uns tragen
+- zuletzt: die Nummer, bei der der Finger verharrt

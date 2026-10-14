@@ -254,11 +254,11 @@ const STEPS = [
     status: "platzhalter", todo: "Story fertigstellen; danach folgt der dreistellige Code" },
   /* Letzter Schlüssel: ein dreistelliger Code, unendlich viele Versuche. Erste Ziffer: Anzahl der Zeichen der römischen Zahl
      aus dem Rätsel am Anfang; zweite Ziffer: Zahl, die im Rucksack versteckt ist; dritte Ziffer: Hausnummer des Gebäudes, auf
-     das der Finger der Marktweiber zeigt (Hausnummer 3, auf dem Foto zu sehen). Der Zettel mit den Hinweisen bleibt sichtbar. */
+     das der Finger der Marktweiber zeigt (Hausnummer 3, auf dem Foto zu sehen). Lösung: 483. Der Zettel bleibt sichtbar. */
   { id: "code-eingabe", type: "password", title: "Letzter Schlüssel: dreistelliger Code (T33 + T34)", md: "90ce1763", noteMd: "5edb4ab3",
-    placeholder: "CODE (3 ZIFFERN)", answers: ["123"], inputmode: "numeric", maxlength: 3, button: "CODE PRÜFEN",
+    placeholder: "CODE (3 ZIFFERN)", answers: ["483"], inputmode: "numeric", maxlength: 3, button: "CODE PRÜFEN",
     texts: { empty: "BITTE DEN CODE EINGEBEN", ok: "CODE STIMMT ✔", wrong: "DAS IST NICHT DER CODE – PROBIERT ES NOCH EINMAL" },
-    status: "platzhalter", todo: "echten Code eintragen (1. Ziffer: römische Zahl, 2. Ziffer: Rucksack, 3. Ziffer: Hausnummer 3); Rätsel am Anfang und Rucksack-Ziffer fehlen noch" },
+    status: "platzhalter", todo: "Code 483 steht fest; das Rätsel mit der römischen Zahl (4 Zeichen) am Anfang und die Zahl 8 im Rucksack müssen noch eingebaut werden" },
   { id: "brunnen-geschafft", type: "info", title: "Der Code stimmt: Brunnen geschafft (T35)", md: "e9777b85", button: "WEITER",
     status: "platzhalter", todo: "Story fertigstellen; hier geht die Geschichte weiter" },
   /* Die Geschichte ist noch nicht zu Ende: weitere Schritte kommen zwischen „brunnen-geschafft“ und ende.
