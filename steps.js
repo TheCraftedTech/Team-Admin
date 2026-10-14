@@ -70,7 +70,8 @@
    verhindern nur das Erraten, keine Einsicht in steps.js.
 
    TEXT-ÜBERSICHT (T = Text, B = Bild; die Nummern bleiben stabil, auch wenn die Reihenfolge geändert wird)
-     T01  Einführung „Es geht los“           content/8861a3f4.md   Platzhalter   (Bild B01: 9bde63bf.png)
+     T01  Einführung: Kunstwerk Turm VI      content/8861a3f4.md   Platzhalter
+     T39  Das Handy meldet sich (Story-Start)   content/4beb0d1c.md   Platzhalter   (Bild B01: 9bde63bf.png)
      T10  Wichtige Hinweise (Sicherheit)     content/ce0d842b.md   fertig
      T11  Schmierpapier und Stift            content/1b49aee5.md   fertig
      T02  Story 1 (nach Ort 2)               content/2bfc795f.md   Platzhalter   (Bild B03: bcb145ef.jpg)
@@ -130,12 +131,15 @@ const SETTINGS = {
 
 const STEPS = [
   /* ---- Einführung ---- */
-  { id: "einfuehrung", type: "info", title: "Einführung: Es geht los (T01)", md: "8861a3f4", button: "WEITER",
-    status: "platzhalter", todo: "Entwurf prüfen (Absturz in Singen, Forschungsteam, Alien-Handy); Bild ersetzen" },
+  { id: "einfuehrung", type: "info", title: "Einführung: Kunstwerk Turm VI betrachten (T01)", md: "8861a3f4", button: "WEITER",
+    status: "platzhalter", todo: "Entwurf prüfen; evtl. Foto von Turm VI ergänzen (16:9)" },
   { id: "hinweise-sicherheit", type: "info", title: "Wichtige Hinweise: Sicherheit (T10)", md: "ce0d842b", button: "VERSTANDEN",
     status: "fertig", todo: "optional: Telefonnummer des Teams ergänzen" },
-  { id: "hinweise-notizen", type: "info", title: "Schmierpapier und Stift (T11)", md: "1b49aee5", button: "LOS GEHT'S",
+  { id: "hinweise-notizen", type: "info", title: "Schmierpapier und Stift (T11)", md: "1b49aee5", button: "WEITER",
     status: "fertig", todo: "entscheiden, ob die Seite bleibt" },
+  /* Die Story beginnt mitten drin: Das Handy der Aliens haben die Forscher schon gefunden. */
+  { id: "story-0", type: "info", title: "Das Handy meldet sich: Story-Start (T39)", md: "4beb0d1c", button: "LOS GEHT'S",
+    status: "platzhalter", todo: "Entwurf prüfen; Bild ersetzen" },
 
   /* Ort 1 ist der Start (Turm VI, 47.758796076746 / 8.83948384873872): Dort findet die Einführung statt,
      deshalb gibt es dafür keinen eigenen Ortungs-Schritt. Die Orte 2 bis 7 folgen der Reihe nach,
