@@ -205,6 +205,27 @@
     .opt:disabled:not(.right):not(.wrong) { color: #5f7168; border: 1px dashed #34443d; background: rgba(255, 255, 255, 0.03); box-shadow: none; }
     .est-hist { list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13px; letter-spacing: 1px; color: var(--muted); }
     .est-hist li { padding: 8px 10px; border: 1px solid #25463a; border-radius: 8px; }
+    /* Modul „audio“ */
+    .aud-panel { display: flex; flex-direction: column; gap: 12px; padding: 14px; border: 1px solid #1f5a3f; border-radius: 12px; background: rgba(0, 255, 102, 0.04); }
+    .aud-scope { display: block; width: 100%; height: 70px; border-radius: 8px; background: rgba(0, 0, 0, 0.45); border: 1px solid #14402c; }
+    .aud-meter { display: flex; align-items: center; gap: 10px; }
+    .aud-bar { flex: 1; height: 12px; border-radius: 6px; border: 1px solid #1f5a3f; background: rgba(0, 0, 0, 0.5); overflow: hidden; }
+    .aud-fill { height: 100%; width: 0; background: linear-gradient(90deg, #ff3b5c, #ffb300 55%, #00f0ff); transition: width 0.25s; }
+    .aud-fill.clear { background: var(--green); box-shadow: 0 0 12px var(--green); }
+    .aud-meter-text { flex: none; min-width: 9.5em; text-align: right; font-size: 12px; letter-spacing: 1px; color: var(--cyan); }
+    .aud-transport { display: flex; gap: 8px; }
+    .aud-transport button { flex: 1 1 0; width: auto; padding: 13px 6px; font-size: 13px; letter-spacing: 1px; }
+    .aud-transport button:nth-child(2) { flex: 2 1 0; }
+    .aud-time { text-align: center; font-size: 12px; letter-spacing: 2px; color: var(--muted); }
+    .aud-range { width: 100%; height: 34px; margin: 0; background: transparent; accent-color: var(--green); }
+    .aud-knobs { display: flex; flex-direction: column; gap: 6px; }
+    .aud-dir { padding: 12px; font-size: 14px; background: rgba(0, 240, 255, 0.08); color: var(--cyan); border-color: var(--cyan); }
+    .aud-dir.on { background: rgba(0, 240, 255, 0.28); color: #fff; box-shadow: 0 0 14px rgba(0, 240, 255, 0.5); }
+    .aud-row { display: grid; grid-template-columns: 5.2em 1fr 4.6em; align-items: center; gap: 8px; font-size: 12px; letter-spacing: 1px; color: #cfe9dd; }
+    .aud-val { text-align: right; color: var(--green); }
+    .aud-tip { padding: 14px; border: 1px dashed var(--cyan); border-radius: 10px; color: var(--cyan); font-size: 14px; line-height: 1.5; text-align: center; }
+    .aud-tip[hidden] { display: none; }
+
     /* Galgenmännchen */
     .hang-fig { width: 100%; max-width: 135px; height: auto; align-self: center; fill: none; stroke: var(--green); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 5px rgba(0, 255, 102, 0.7)); }
     .hang-gallows { stroke: #3d7a5c; filter: none; }

@@ -43,6 +43,12 @@
                                                  Felder: backTo (id: Ziel des „‹ ZURÜCK“-Knopfs), trackLength (Länge der Strecke, Standard 6000),
                                                  gap (Breite des garantiert freien Wegs, Standard 200 – kleiner = schwerer),
                                                  density (Dichte der Hindernisse 0–1, Standard 0.3), shipRadius, undoLength, seed
+     audio     Aufgabe: die verzerrte Aufnahme der Aliens reparieren. Anhören, Vor-/Zurückspulen, Regler für Richtung, Tempo,
+               Tiefen und Höhen wirken sofort; passen alle Regler, erscheint „WEITER“. Läuft im Browser (Web Audio API).
+                                                 Felder: md, src (Audiodatei in content/, am besten .mp3 – mit tools/hashify.js anlegen),
+                                                 distort ({ reverse, rate, bass, treble }: die eingebaute Störung; die richtige Einstellung
+                                                 ist jeweils das Gegenteil, Standard { reverse: true, rate: 1.6, bass: 12, treble: -12 }),
+                                                 hint (Tipp auf Knopfdruck), button, tolRate, tolEq (erlaubte Abweichungen)
      end       Abschlussseite.                   Felder: md
 
    Gemeinsame Felder:
@@ -96,6 +102,7 @@
      T35  Sender aktiviert: Daten gesendet   content/e9777b85.md   Platzhalter
      T36  Die Antwort kommt (zum Ohr gehen)  content/a367b120.md   Platzhalter
      T37  Ein Ohr für die Antwort            content/68a0892a.md   Platzhalter
+     T38  Die Antwort der Aliens (Audio)     content/7bb26811.md   Platzhalter   (Aufnahme: 136cd2ad.mp3, Platzhalter-Aufnahme)
      T09  Ende (VORLÄUFIG)                   content/0845e9c6.md   Platzhalter   (Bild B09: a6db5dd6.jpg)
 
    Es gibt keine Obergrenze für Schritte: lieber jedes Detail als eigenen Schritt anlegen, dann lässt sich
@@ -267,12 +274,16 @@ const STEPS = [
      entfernt). Normaler Ortungs-Schritt; die Seite davor nennt den Ort nie als Entfernung. */
   { id: "story-15", type: "info", title: "Die Antwort kommt: zum Ohr gehen (T36)", md: "a367b120", button: "WEITER",
     status: "platzhalter", todo: "Text prüfen; Wortlaut für das Ohr abstimmen" },
-  { id: "ohr", type: "locate", title: "Ort 12 (das Ohr, ca. 50 m vom Brunnen)", lat: 47.7610785, lng: 8.8394407, status: "platzhalter",
-    todo: "ECHTE KOORDINATEN DES OHRS EINTRAGEN (aktuell nur ein Platzhalter-Punkt 50 m nördlich vom Brunnen)" },
+  { id: "ohr", type: "locate", title: "Ort 12 (das Ohr, ca. 50 m vom Brunnen)", lat: 47.76104408397673, lng: 8.839113177063808, status: "fertig",
+    todo: "vor Ort prüfen" },
   { id: "story-16", type: "info", title: "Ein Ohr für die Antwort (T37)", md: "68a0892a", button: "WEITER",
-    status: "platzhalter", todo: "Hier folgt die Audio-Aufgabe (verzerrte Aufnahme reparieren); Text und Bild ersetzen" },
-  /* Die Geschichte ist noch nicht zu Ende: Hier kommt später der Audio-Editor (Aufnahme reparieren) – dann das Ende.
-     Das Ende selbst ist vorläufig. */
+    status: "platzhalter", todo: "Text und Bild ersetzen" },
+  /* Die Aufnahme der Aliens (Platzhalter-Aufnahme, content/136cd2ad.mp3) klingt zuerst seltsam: rückwärts, zu schnell, mit
+     verbogenen Tiefen und Höhen. Richtig eingestellt (Richtung umkehren, Tempo ca. ×0,63, Tiefen −12 dB, Höhen +12 dB) ist sie klar.
+     Der Tipp spielt auf das Ohr an. Danach: Ende der Rallye (noch vorläufig). */
+  { id: "audio-reparieren", type: "audio", title: "Die Antwort der Aliens: Aufnahme reparieren (T38)", md: "7bb26811", src: "136cd2ad.mp3",
+    distort: { reverse: true, rate: 1.6, bass: 12, treble: -12 }, hint: "Alien-Audios hört man nur mit dem linken Ohr.", button: "WEITER",
+    status: "platzhalter", todo: "echte Aufnahme einsetzen (Datei mit tools/hashify.js nach content/, src anpassen); Schwierigkeit und Tipp auf dem Handy testen" },
   { id: "ende", type: "end", title: "Ende, vorläufig (T09)", md: "0845e9c6",
     status: "platzhalter", todo: "echtes Ende schreiben" }
 ];

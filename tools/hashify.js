@@ -3,7 +3,7 @@
    tools/hashify.js – legt Inhalte mit kurzem Hash-Namen im Ordner content/ ab
 
    Bilder und Texte kopieren (Originale bleiben unverändert):
-     node tools/hashify.js bild.png foto.jpg text.md
+     node tools/hashify.js bild.png foto.jpg text.md aufnahme.mp3
    → content/<8 Zeichen Hash des Inhalts>.png  usw. und die Zeile zum Einfügen
 
    Neuen Text mit festem Namen anlegen (zum Weiterschreiben; der Name bleibt beim Bearbeiten gleich):
@@ -18,6 +18,7 @@ const crypto = require("crypto");
 
 const OUT = path.join(__dirname, "..", "content");
 const IMAGE_EXT = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp"]);
+const AUDIO_EXT = new Set([".mp3", ".m4a", ".wav", ".ogg"]);
 const args = process.argv.slice(2);
 
 function fail(msg) { console.error(msg); process.exit(1); }
@@ -41,7 +42,8 @@ for (const file of args) {
   let ext = path.extname(file).toLowerCase();
   if (ext === ".jpeg") ext = ".jpg";
   const isImage = IMAGE_EXT.has(ext);
-  if (!isImage && ext !== ".md") fail(`Nicht unterstützt: ${file} (erlaubt: .md, .png, .jpg, .gif, .webp)`);
+  const isAudio = AUDIO_EXT.has(ext);
+  if (!isImage && !isAudio && ext !== ".md") fail(`Nicht unterstützt: ${file} (erlaubt: .md, .png, .jpg, .gif, .webp, .mp3, .m4a, .wav, .ogg)`);
 
   const bytes = fs.readFileSync(file);
   const id = crypto.createHash("sha1").update(bytes).digest("hex").slice(0, 8);
@@ -50,5 +52,5 @@ for (const file of args) {
   fs.copyFileSync(file, target);
 
   console.log(`${path.basename(file)}  →  content/${id}${ext}`);
-  console.log(isImage ? `   im Markdown:  ![Beschreibung](${id}${ext})` : `   in steps.js:  md: "${id}"`);
+  console.log(isImage ? `   im Markdown:  ![Beschreibung](${id}${ext})` : isAudio ? `   in steps.js:  src: "${id}${ext}"  (Modul „audio“; mp3 läuft auf allen Handys)` : `   in steps.js:  md: "${id}"`);
 }
