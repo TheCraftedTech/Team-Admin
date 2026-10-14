@@ -350,12 +350,6 @@ function goTo(index) {
   showStep();
 }
 
-/** Fortschrittspunkte (kein Text): ein Punkt je Schritt */
-function renderDots(el) {
-  if (el.children.length !== STEPS.length) el.replaceChildren(...STEPS.map(() => document.createElement("i")));
-  [...el.children].forEach((d, i) => { d.className = i < state.index ? "done" : i === state.index ? "now" : ""; });
-}
-
 function startApp() {
   requestWake();
   document.addEventListener("visibilitychange", () => {

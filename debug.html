@@ -38,6 +38,15 @@
     .steps button .ty { color: var(--cyan); min-width: 6.5em; }
     .steps button.now { border-color: var(--green); background: rgba(0, 255, 102, 0.12); color: var(--green); }
     .steps button.done .no::after { content: " ✔"; color: var(--green); }
+    .steps button { flex-wrap: wrap; }
+    .steps button .ti { flex: 1; min-width: 8em; }
+    .steps button .todo { flex: 1 1 100%; padding-left: calc(1.6em + 8px); font-size: 11px; color: var(--muted); }
+    .badge { font-size: 10px; letter-spacing: 1px; padding: 1px 6px; border-radius: 4px; border: 1px solid; white-space: nowrap; align-self: center; }
+    .badge.fertig { color: var(--green); border-color: var(--green); }
+    .badge.platzhalter { color: var(--amber); border-color: var(--amber); }
+    .summary { margin-bottom: 8px; line-height: 1.7; }
+    .summary b.f { color: var(--green); }
+    .summary b.p { color: var(--amber); }
 
     pre { white-space: pre-wrap; line-height: 1.55; color: #d6efe3; }
     #log { max-height: 150px; overflow-y: auto; color: var(--muted); font-size: 12px; }
@@ -62,6 +71,8 @@
 
       <section>
         <h2>Schritte (zum Wechseln antippen)</h2>
+        <p class="summary" id="stepsSummary"></p>
+        <div class="row" style="margin: 0 0 8px"><label><input type="checkbox" id="onlyTodo"> nur „Platzhalter“ anzeigen (Inhalt noch zu ersetzen)</label></div>
         <div class="steps" id="steps"></div>
         <div class="row">
           <button type="button" id="prev">‹ Schritt zurück</button>
@@ -164,7 +175,7 @@
   function snapshot() {
     return JSON.parse(ev("JSON.stringify({" +
       "index: state.index, total: STEPS.length," +
-      "steps: STEPS.map((s) => ({ id: s.id, type: s.type, title: s.title || s.id }))," +
+      "steps: STEPS.map((s) => ({ id: s.id, type: s.type, title: s.title || s.id, status: s.status || 'platzhalter', todo: s.todo || '' }))," +
       "step: STEPS[state.index]," +
       "info: current && current.instance && current.instance.info ? current.instance.info() : null," +
       "pos: pos ? { acc: pos.acc, age: (Date.now() - pos.t) / 1000 } : null," +
@@ -338,7 +349,19 @@
   /* ---------- Anzeige ---------- */
   let renderedIndex = -1, renderedTotal = -1;
 
+  let stepList = [];
+
+  /** Zeigt je Schritt „fertig“ oder „Platzhalter“ (Status steht in steps.js) und blendet auf Wunsch die fertigen aus */
+  function applyFilter() {
+    const only = $("onlyTodo").checked;
+    [...$("steps").children].forEach((b, i) => { b.hidden = only && stepList[i] && stepList[i].status !== "platzhalter"; });
+    const done = stepList.filter((st) => st.status === "fertig").length;
+    $("stepsSummary").innerHTML = `<b class="f">${done} fertig</b> · <b class="p">${stepList.length - done} mit Platzhalter (Inhalt noch zu ersetzen)</b> · ${stepList.length} Schritte`;
+  }
+  $("onlyTodo").addEventListener("change", applyFilter);
+
   function renderSteps(s) {
+    stepList = s.steps;
     const box = $("steps");
     box.replaceChildren(...s.steps.map((st, i) => {
       const b = document.createElement("button");
@@ -346,11 +369,20 @@
       b.className = i === s.index ? "now" : i < s.index ? "done" : "";
       const no = document.createElement("span"); no.className = "no"; no.textContent = String(i + 1);
       const ty = document.createElement("span"); ty.className = "ty"; ty.textContent = st.type;
-      const ti = document.createElement("span"); ti.textContent = st.title;
-      b.append(no, ty, ti);
+      const ti = document.createElement("span"); ti.className = "ti"; ti.textContent = st.title;
+      const badge = document.createElement("span");
+      badge.className = `badge ${st.status}`;
+      badge.textContent = st.status === "fertig" ? "✔ FERTIG" : "✎ PLATZHALTER";
+      b.append(no, ty, ti, badge);
+      if (st.todo) {
+        const todo = document.createElement("span"); todo.className = "todo"; todo.textContent = `→ ${st.todo}`;
+        b.append(todo);
+        b.title = st.todo;
+      }
       b.addEventListener("click", () => act("Wechsel", () => goTo(i)));
       return b;
     }));
+    applyFilter();
   }
 
   function renderStatus() {
@@ -376,6 +408,7 @@
 
     const lines = [`Schritt ${s.index + 1} / ${s.total}: ${s.step.title || s.step.id}  [${s.step.type}]`];
     if (s.step.md) lines.push(`Inhalt: content/${s.step.md}.md`);
+    lines.push(`Status: ${s.step.status === "fertig" ? "fertig" : "PLATZHALTER – Inhalt noch zu ersetzen"}${s.step.todo ? " → " + s.step.todo : ""}`);
     if (s.step.type === "locate" && s.info) {
       lines.push(`Entfernung: ${s.info.dist === null ? "–" : Math.round(s.info.dist) + " m"}   Angekommen: ${s.info.arrived ? "JA (WEITER sichtbar)" : "nein"}`);
       lines.push(`Regel: Radius ${s.info.radius} m, Genauigkeit ≤ ${s.info.maxAcc} m, ${s.info.holdSeconds} s ununterbrochen (jetzt ${s.info.held.toFixed(1)} s); „FAST DA“ ab ${s.info.approach} m`);

@@ -164,17 +164,14 @@ registerModule("locate", (ctx) => {
   canvas.setAttribute("aria-label", "Radar");
   const distEl = h("div", "dist", "ENTFERNUNG: – – –");
   const noteEl = h("div", "note");
-  const dotsEl = h("div", "dots");
-  dotsEl.setAttribute("aria-hidden", "true");
   const nextBtn = h("button", "go", "WEITER ›");
   nextBtn.type = "button";
   nextBtn.hidden = true;
 
   ctx.root.append(
     h("main", "stage", "", [canvas]),
-    h("footer", "bottom", "", [distEl, noteEl, dotsEl, nextBtn])
+    h("footer", "bottom", "", [distEl, noteEl, nextBtn])
   );
-  renderDots(dotsEl);
 
   /* ----- Logik: Entfernung, Ankunft ----- */
   let arrived = Boolean(ctx.data.arrived);   // eingerastet: bleibt, bis „WEITER“ gedrückt wird (auch nach Neuladen)
