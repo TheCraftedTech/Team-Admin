@@ -141,16 +141,19 @@ const STEPS = [
   { id: "story-0", type: "info", title: "Das Handy meldet sich: Story-Start (T39)", md: "4beb0d1c", button: "LOS GEHT'S",
     status: "platzhalter", todo: "Entwurf prüfen; Bild ersetzen" },
 
+  /* Kunstwerke gibt es nur am Anfang und am Ende einer Ortungs-Strecke (Turm VI, Marktweiber, Sternkarte, Hauser-Brunnen).
+     Die Story-Seiten dazwischen sind reine Wegführung: stehen bleiben, lesen, Gedanken machen, weitergehen. Die Aliens sprechen
+     in verdrehter Satzstellung („Kaputt unser Navigationssystem ist“). */
   /* Ort 1 ist der Start (Turm VI, 47.758796076746 / 8.83948384873872): Dort findet die Einführung statt,
      deshalb gibt es dafür keinen eigenen Ortungs-Schritt. Die Orte 2 bis 7 folgen der Reihe nach,
      zwischen zwei Orten liegt jeweils mindestens ein Story-Schritt. */
   { id: "ort2", type: "locate", title: "Ort 2", lat: 47.759442881868516, lng: 8.8405967427222, status: "fertig" },
-  { id: "story-1", type: "info", title: "Story 1 (T02)", md: "2bfc795f", button: "WEITER",
-    status: "platzhalter", todo: "Entwurf prüfen; Name des Kunstwerks an Ort 2 ergänzen; Bild ersetzen (Festplattenteil 1 von 6)" },
+  { id: "story-1", type: "info", title: "Story 1 (T02)", md: "2bfc795f", button: "VERSTANDEN",
+    status: "platzhalter", todo: "Entwurf prüfen (reine Wegführung, Festplattenteil 1 von 6); Bild ersetzen" },
 
   { id: "ort3", type: "locate", title: "Ort 3", lat: 47.760105831192874, lng: 8.839979882181922, status: "fertig" },
   { id: "story-2", type: "info", title: "Story 2 (T03)", md: "07188df6", button: "WEITER",
-    status: "platzhalter", todo: "Entwurf prüfen; Name des Kunstwerks an Ort 3 ergänzen; Bild ersetzen (Festplattenteil 2 von 6)" },
+    status: "platzhalter", todo: "Entwurf prüfen (reine Wegführung, Festplattenteil 2 von 6); Bild ersetzen" },
 
   { id: "ort4", type: "locate", title: "Ort 4", lat: 47.76058112053592,  lng: 8.841501782310322, status: "fertig" },
 
@@ -169,15 +172,15 @@ const STEPS = [
   /* Nach dem Störsender kein eigener Schritt: die Meldung „abgeschaltet“ (leadMd) steht direkt über der
      jetzt lesbaren Story 3 – derselbe Text wie auf der gestörten Seite. */
   { id: "story-3-klar", type: "info", title: "Story 3, jetzt lesbar + Meldung „abgeschaltet“ (T04 + T06)", md: "609fe145", leadMd: "6c4d0427", button: "WEITER",
-    status: "platzhalter", todo: "Entwurf prüfen (erste Nachricht der Aliens, Festplattenteil 3 von 6); Bild ersetzen" },
+    status: "platzhalter", todo: "Entwurf prüfen (erste Nachricht in Alien-Satzstellung, Festplattenteil 3 von 6); Bild ersetzen" },
 
   { id: "ort5", type: "locate", title: "Ort 5", lat: 47.76114913914456,  lng: 8.841115675526469, status: "fertig" },
-  { id: "story-4", type: "info", title: "Story 4 (T07)", md: "6181fe9d", button: "WEITER",
-    status: "platzhalter", todo: "Entwurf prüfen; Name des Kunstwerks an Ort 5 ergänzen; Bild ersetzen (Festplattenteil 4 von 6)" },
+  { id: "story-4", type: "info", title: "Story 4 (T07)", md: "6181fe9d", button: "ALLES KLAR",
+    status: "platzhalter", todo: "Entwurf prüfen (reine Wegführung, Festplattenteil 4 von 6); Bild ersetzen" },
 
   { id: "ort6", type: "locate", title: "Ort 6", lat: 47.76170564732148,  lng: 8.842634771566102, status: "fertig" },
   { id: "story-5", type: "info", title: "Story 5 (T08)", md: "70e24aae", button: "WEITER",
-    status: "platzhalter", todo: "Entwurf prüfen; Bild ersetzen (Festplattenteil 5 von 6); Name des Kunstwerks an Ort 6 ergänzen" },
+    status: "platzhalter", todo: "Entwurf prüfen (reine Wegführung, Festplattenteil 5 von 6); Bild ersetzen" },
 
   /* Ort 7: die Marktweiber (3D-Scan zur Ansicht: https://scaniverse.com/scan/neojb4zuuz3gxyua).
      Nach der Ankunft: Story, eine freie Aufgabe (eigene Dialoge erfinden), dann die Dialog-Aufgabe. */
@@ -243,7 +246,7 @@ const STEPS = [
     status: "platzhalter", todo: "Entwurf prüfen (Turm = Sender)" },
   { id: "ort9", type: "locate", title: "Ort 9 (Weg zum Hauser-Brunnen, Zwischenpunkt 1)", lat: 47.76171033989303, lng: 8.840728125758773, status: "fertig" },
   { id: "story-12", type: "info", title: "Erster Zwischenpunkt (T24)", md: "e485be82", button: "WEITER",
-    status: "platzhalter", todo: "Entwurf prüfen; evtl. Hinweis auf den echten Ort ergänzen" },
+    status: "platzhalter", todo: "Entwurf prüfen (reine Wegführung)" },
   { id: "ort10", type: "locate", title: "Ort 10 (Weg zum Hauser-Brunnen, Zwischenpunkt 2)", lat: 47.761144187762625, lng: 8.84110899942255, status: "fertig" },
   { id: "story-13", type: "info", title: "Zweiter Zwischenpunkt (T25)", md: "d2792e96", button: "WEITER",
     status: "platzhalter", todo: "Entwurf prüfen" },
