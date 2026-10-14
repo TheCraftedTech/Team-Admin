@@ -5,7 +5,9 @@
              darunter (hintMd) oder einer Meldung darüber (leadMd)
    dialog    Aufgabe: Sätze eines Dialogs per Ziehen in die richtige Reihenfolge bringen, umschaltbar Schwäbisch / Deutsch
    locate    Ortungs-Radar zu einem Ort, „WEITER“ erst am Ort
-   password  Eingabefeld für ein Passwort (Text darüber aus Markdown)
+   password  Eingabefeld für ein Passwort (Text darüber aus Markdown); optional failTo: falsch → zurück zu einem Schritt
+   choice    Frage mit Auswahlantworten (eine antippen, dann prüfen); optional failTo
+   estimate  Zahl schätzen: „zu groß / zu klein / viel zu …“, bis sie stimmt
    memory    Aufgabe: Muster aus leuchtenden Tasten merken und nachtippen
    end       Abschlussseite (Inhalt aus einer Markdown-Datei)
    Inhalte und Reihenfolge stehen in steps.js, die Steuerung in core.js.
@@ -137,19 +139,196 @@ registerModule("password", (ctx) => {
       button.disabled = true;
       vibrateOnce();
       timer = setTimeout(() => ctx.next(), 700);
+    } else if (S.failTo) {
+      input.disabled = true;
+      button.disabled = true;
+      timer = restartAfterWrong(ctx, page, feedback);
     } else {
       feedback.className = "feedback err";
       feedback.textContent = "FALSCHES PASSWORT – VERSUCHT ES NOCH EINMAL";
-      page.classList.remove("shake");
-      void page.offsetWidth;            // Animation neu starten
-      page.classList.add("shake");
+      shakePage(page);
       input.select();
     }
   });
 
   return {
     destroy() { clearTimeout(timer); },
-    info: () => ({ type: "password", answers: [].concat(S.answers || []) })
+    debugAnswer(text) { input.value = text; form.requestSubmit(); },
+    info: () => ({ type: "password", answers: [].concat(S.answers || []), failTo: S.failTo || null })
+  };
+});
+
+/** Gemeinsam für die Frage-Module (password, choice, estimate) */
+function shakePage(page) {
+  page.classList.remove("shake");
+  void page.offsetWidth;                // Animation neu starten
+  page.classList.add("shake");
+}
+
+/** Falsche Antwort mit failTo: Meldung zeigen und nach kurzer Pause zurück zum angegebenen Schritt (Rückgabe: Timer) */
+function restartAfterWrong(ctx, page, feedback) {
+  feedback.className = "feedback err";
+  feedback.textContent = ctx.step.failText || "FALSCH – DIE ENTSCHLÜSSELUNG BEGINNT VON VORN";
+  shakePage(page);
+  vibrateOnce();
+  return setTimeout(() => ctx.goToId(ctx.step.failTo), 1800);
+}
+
+/* ======================================================================
+   Modul „choice“ – Frage mit Auswahlantworten (eine antippen, dann prüfen)
+   Felder: md (Frage), options[], answers[] (richtige Option(en), als Text), button, failTo, failText
+   ====================================================================== */
+registerModule("choice", (ctx) => {
+  const S = ctx.step;
+  let picked = -1;
+  let timer = 0;
+
+  const buttons = (S.options || []).map((label, i) => {
+    const b = h("button", "opt", label);
+    b.type = "button";
+    b.setAttribute("aria-pressed", "false");
+    b.addEventListener("click", () => {
+      picked = i;
+      buttons.forEach((o, j) => o.setAttribute("aria-pressed", String(j === i)));
+      check.disabled = false;
+      feedback.textContent = "";
+      feedback.className = "feedback";
+    });
+    return b;
+  });
+  const check = h("button", "go", S.button || "PRÜFEN");
+  check.type = "button";
+  check.disabled = true;
+  const feedback = h("div", "feedback");
+  feedback.setAttribute("role", "status");
+
+  const parts = [];
+  if (S.md) {
+    const content = h("div", "md");
+    parts.push(content);
+    fillMarkdown(content, S.md);
+  }
+  parts.push(h("div", "opts", "", buttons), check, feedback);
+  const page = h("div", "page", "", parts);
+  ctx.root.append(h("div", "scroller", "", [page]));
+
+  const lock = () => { buttons.forEach((b) => { b.disabled = true; }); check.disabled = true; };
+  check.addEventListener("click", () => {
+    if (picked < 0 || check.disabled) return;
+    lock();
+    if (matchesAnswer(S.options[picked], S.answers)) {
+      buttons[picked].classList.add("right");
+      feedback.className = "feedback ok";
+      feedback.textContent = "RICHTIG ✔";
+      vibrateOnce();
+      timer = setTimeout(() => ctx.next(), 800);
+    } else {
+      buttons[picked].classList.add("wrong");
+      if (S.failTo) {
+        timer = restartAfterWrong(ctx, page, feedback);
+      } else {
+        feedback.className = "feedback err";
+        feedback.textContent = "FALSCH – VERSUCHT ES NOCH EINMAL";
+        shakePage(page);
+        timer = setTimeout(() => {
+          buttons.forEach((b) => { b.disabled = false; b.classList.remove("wrong"); });
+          picked = -1;
+          buttons.forEach((b) => b.setAttribute("aria-pressed", "false"));
+        }, 900);
+      }
+    }
+  });
+
+  return {
+    destroy() { clearTimeout(timer); },
+    debugPick(right = true) {
+      const i = S.options.findIndex((o) => matchesAnswer(o, S.answers) === right);
+      buttons[i].click();
+      check.click();
+    },
+    info: () => ({ type: "choice", options: S.options, answers: [].concat(S.answers || []), picked, failTo: S.failTo || null })
+  };
+});
+
+/* ======================================================================
+   Modul „estimate“ – eine Zahl schätzen: die Seite sagt „zu groß / zu klein“ (bei großem Abstand „viel zu …“),
+   bis die Zahl stimmt. Eingabe mit höchstens decimals Nachkommastellen (Komma oder Punkt).
+   Felder: md (Frage), answer (richtige Zahl), unit (z. B. "m"), decimals (Standard 1),
+           farFactor (ab diesem Anteil der richtigen Zahl heißt es „viel zu …“, Standard 0.35), placeholder, button
+   ====================================================================== */
+registerModule("estimate", (ctx) => {
+  const S = ctx.step;
+  const decimals = S.decimals ?? 1;
+  const unit = S.unit ? ` ${S.unit}` : "";
+  const target = Number(S.answer);
+  const factor = 10 ** decimals;
+  const show = (n) => n.toFixed(decimals).replace(".", ",") + unit;
+  let timer = 0, tries = 0, solved = false;
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "field";
+  input.placeholder = S.placeholder || "SCHÄTZUNG";
+  input.autocomplete = "off";
+  input.setAttribute("inputmode", "decimal");
+  input.setAttribute("enterkeyhint", "go");
+  input.setAttribute("aria-label", S.placeholder || "Schätzung");
+  const button = h("button", "go", S.button || "PRÜFEN");
+  button.type = "submit";
+  const feedback = h("div", "feedback");
+  feedback.setAttribute("role", "status");
+  const history = h("ul", "est-hist");
+  const form = h("form", "", "", [input, button]);
+  form.noValidate = true;
+
+  const parts = [];
+  if (S.md) {
+    const content = h("div", "md");
+    parts.push(content);
+    fillMarkdown(content, S.md);
+  }
+  parts.push(form, feedback, history);
+  const page = h("div", "page", "", parts);
+  ctx.root.append(h("div", "scroller", "", [page]));
+
+  const pattern = new RegExp(`^\\d+([.,]\\d{1,${Math.max(decimals, 1)}})?$`);
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (solved) return;
+    const text = input.value.trim();
+    if (!pattern.test(text) || (decimals === 0 && /[.,]/.test(text))) {
+      feedback.className = "feedback err";
+      feedback.textContent = decimals ? `BITTE EINE ZAHL MIT HÖCHSTENS ${decimals} NACHKOMMASTELLE EINGEBEN (Z. B. 8,5)` : "BITTE EINE GANZE ZAHL EINGEBEN";
+      return;
+    }
+    const guess = Math.round(Number(text.replace(",", ".")) * factor) / factor;
+    tries++;
+    if (guess === Math.round(target * factor) / factor) {
+      solved = true;
+      input.disabled = true;
+      button.disabled = true;
+      feedback.className = "feedback ok";
+      feedback.textContent = `${show(guess)} – GENAU RICHTIG ✔`;
+      vibrateOnce();
+      timer = setTimeout(() => ctx.next(), 1000);
+      return;
+    }
+    const tooBig = guess > target;
+    const far = Math.abs(guess - target) > target * (S.farFactor ?? 0.35);
+    const verdict = `${far ? "VIEL " : ""}ZU ${tooBig ? "GROSS" : "KLEIN"}`;
+    feedback.className = "feedback err";
+    feedback.textContent = `${show(guess)}: ${verdict}`;
+    const li = h("li", far ? "far" : "", `${tooBig ? "▼" : "▲"} ${show(guess)} – ${verdict}`);
+    history.prepend(li);
+    while (history.children.length > 6) history.lastChild.remove();
+    shakePage(page);
+    input.select();
+  });
+
+  return {
+    destroy() { clearTimeout(timer); },
+    debugAnswer(value) { input.value = String(value); form.requestSubmit(); },
+    info: () => ({ type: "estimate", answer: target, unit: S.unit || "", decimals, tries, solved })
   };
 });
 
