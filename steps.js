@@ -54,7 +54,8 @@
      T14  Eine Aufgabe für euch (Dialog)     content/bed8f3d0.md   Platzhalter   (Bild B11: c35292a8.jpg)
      T15  Der belauschte Streit (Anleitung)  content/35e6e118.md   fertig
      T16  Aufzeichnung rekonstruiert (Gespräch) content/e6a5e05c.md   fertig
-     T17  Was ist passiert? (Auflösung)      content/dd77d534.md   Platzhalter   (Bild B12: 460f8b86.png) – Audio folgt
+     T18  Aliens schicken euch weiter (Westen)  content/84e2cf1f.md   Platzhalter   (Bild B13: a9897d02.png)
+     T19  Signal gefunden (hier geht es weiter) content/14a6b5ec.md   Platzhalter   (Bild B14: 28ccfcba.jpg)
      T09  Ende (VORLÄUFIG)                   content/0845e9c6.md   Platzhalter   (Bild B09: a6db5dd6.jpg)
 
    Es gibt keine Obergrenze für Schritte: lieber jedes Detail als eigenen Schritt anlegen, dann lässt sich
@@ -165,10 +166,15 @@ const STEPS = [
     ],
     status: "fertig", todo: "deutsche Fassung prüfen; weitere gültige Reihenfolgen in solutions ergänzen" },
   { id: "dialog-fertig", type: "info", title: "Aufzeichnung rekonstruiert: Gespräch darüber (T16)", md: "e6a5e05c", button: "WEITER", status: "fertig" },
-  { id: "aufloesung", type: "info", title: "Was ist passiert? Auflösung (T17)", md: "dd77d534", button: "WEITER",
-    status: "platzhalter", todo: "Audio des Erzählers ergänzen (Audio-Modul folgt); Richtung der Frau zum Weltraum-Kunstwerk festlegen" },
-
-  /* Die Geschichte ist nach dem Dialog noch nicht zu Ende: weitere Schritte kommen zwischen aufloesung und ende.
+  /* Danach schicken die Aliens die Gruppe weiter: etwa 50 Meter nach Westen (tatsächlich ca. 43 m Luftlinie).
+     Wieder ein normaler Ortungs-Schritt mit den angegebenen Koordinaten. */
+  { id: "story-8", type: "info", title: "Die Aliens schicken euch weiter: 50 m nach Westen (T18)", md: "84e2cf1f", button: "WEITER",
+    status: "platzhalter", todo: "Text und Bild prüfen/ersetzen" },
+  { id: "ort8", type: "locate", title: "Ort 8 (ca. 50 m westlich der Marktweiber)", lat: 47.7622598458167, lng: 8.842276178706632, status: "fertig",
+    todo: "Koordinaten vor Ort prüfen (waren nicht ganz genau bekannt)" },
+  { id: "story-9", type: "info", title: "Signal gefunden: hier geht es weiter (T19)", md: "14a6b5ec", button: "WEITER",
+    status: "platzhalter", todo: "Geschichte weiterentwickeln; dort soll ein NFC-Tag gelesen werden (Demo: nfc.html)" },
+  /* Die Geschichte ist noch nicht zu Ende: weitere Schritte kommen zwischen story-9 und ende.
      Das Ende selbst ist vorläufig. */
   { id: "ende", type: "end", title: "Ende, vorläufig (T09)", md: "0845e9c6",
     status: "platzhalter", todo: "echtes Ende schreiben" }
