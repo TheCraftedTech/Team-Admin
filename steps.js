@@ -66,6 +66,10 @@
      T21  Schaut euch die Karte an           content/f5e0f468.md   Platzhalter
      T22  Ihr übernehmt die Navigation       content/6105ac99.md   fertig
      T20  Simulation erfolgreich                 content/413e9fcd.md   Platzhalter   (Bild B15: 2c931172.png)
+     T23  Das nächste Signal (Weg zum Hauser-Brunnen) content/bfaae9dd.md   Platzhalter
+     T24  Erster Zwischenpunkt               content/e485be82.md   Platzhalter
+     T25  Zweiter Zwischenpunkt              content/d2792e96.md   Platzhalter
+     T26  Ankunft am Hauser-Brunnen          content/e4a719d8.md   Platzhalter
      T09  Ende (VORLÄUFIG)                   content/0845e9c6.md   Platzhalter   (Bild B09: a6db5dd6.jpg)
 
    Es gibt keine Obergrenze für Schritte: lieber jedes Detail als eigenen Schritt anlegen, dann lässt sich
@@ -193,7 +197,21 @@ const STEPS = [
     todo: "auf echten Handys testen (Wischen/Malen, Schwierigkeit: gap, trackLength)" },
   { id: "story-10", type: "info", title: "Simulation erfolgreich (T20)", md: "413e9fcd", button: "WEITER",
     status: "platzhalter", todo: "Text und Bild ersetzen; Geschichte weiterentwickeln" },
-  /* Die Geschichte ist noch nicht zu Ende: weitere Schritte kommen zwischen story-10 und ende.
+  /* Weg zum Hauser-Brunnen: Start (ca. 47.76214624845722 / 8.842223027645755) ist nur etwa 13 m vom Ort 8 (Sternkarte)
+     entfernt, also gibt es dafür keinen eigenen Ortungs-Schritt – die Gruppe steht schon dort. Danach zwei Zwischenpunkte
+     und das Ziel (Hauser-Brunnen). Zwischen jedem Ort liegt eine Story-Seite. */
+  { id: "story-11", type: "info", title: "Das nächste Signal: Weg zum Hauser-Brunnen (T23)", md: "bfaae9dd", button: "WEITER",
+    status: "platzhalter", todo: "Story-Text und Bild ersetzen; Verbindung zur „letzten Frage“ in T20 klären" },
+  { id: "ort9", type: "locate", title: "Ort 9 (Weg zum Hauser-Brunnen, Zwischenpunkt 1)", lat: 47.76171033989303, lng: 8.840728125758773, status: "fertig" },
+  { id: "story-12", type: "info", title: "Erster Zwischenpunkt (T24)", md: "e485be82", button: "WEITER",
+    status: "platzhalter", todo: "Story-Text und Bild ersetzen; evtl. Hinweis auf den echten Ort ergänzen" },
+  { id: "ort10", type: "locate", title: "Ort 10 (Weg zum Hauser-Brunnen, Zwischenpunkt 2)", lat: 47.761144187762625, lng: 8.84110899942255, status: "fertig" },
+  { id: "story-13", type: "info", title: "Zweiter Zwischenpunkt (T25)", md: "d2792e96", button: "WEITER",
+    status: "platzhalter", todo: "Story-Text und Bild ersetzen" },
+  { id: "ort11", type: "locate", title: "Ort 11 (Hauser-Brunnen)", lat: 47.7606285151739, lng: 8.839440665486844, status: "fertig" },
+  { id: "story-14", type: "info", title: "Ankunft am Hauser-Brunnen (T26)", md: "e4a719d8", button: "WEITER",
+    status: "platzhalter", todo: "Story-Text und Bild ersetzen; hier folgt später die Aufgabe am Brunnen" },
+  /* Die Geschichte ist noch nicht zu Ende: weitere Schritte kommen zwischen story-14 und ende.
      Das Ende selbst ist vorläufig. */
   { id: "ende", type: "end", title: "Ende, vorläufig (T09)", md: "0845e9c6",
     status: "platzhalter", todo: "echtes Ende schreiben" }
