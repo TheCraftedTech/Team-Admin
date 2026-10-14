@@ -757,17 +757,30 @@ registerModule("dialog", (ctx) => {
 });
 
 /* ======================================================================
-   Modul „sky“ – Sternenhimmel: eine Route für das Raumschiff malen
-   Ein Sternenhimmel aus mehreren Schichten: vorne bewegen sich die Sterne schneller, hinten langsamer –
-   so entsteht beim seitlichen Wischen der Eindruck von Tiefe (Parallaxe). Zwei Betriebsarten unten:
-   FLIEGEN (wischen, ziehen, Pfeiltasten oder Mausrad bewegen den Himmel) und MALEN (eine leuchtende Route
-   zeichnen; am Bildschirmrand weiterziehen, um weiterzufliegen). „ROUTE SENDEN“ lässt das Raumschiff die
-   Route abfliegen, danach geht es mit „WEITER“ oder, für die Nächsten, mit „NOCH EINMAL“ weiter.
-   Felder: backTo (Schritt-ID für „‹ ZURÜCK“), minLength (Mindestlänge der Route in Pixeln)
+   Modul „sky“ – Sternenhimmel: eine sichere Route von links nach rechts planen
+   Ein Sternenhimmel aus mehreren Schichten (vorne bewegen sich die Sterne schneller, hinten langsamer – das
+   ergibt beim seitlichen Wischen den Eindruck von Tiefe). Die Strecke hat links einen START und rechts ein ZIEL
+   und ist an beiden Enden begrenzt. Dazwischen liegen Asteroiden und Kometen.
+   Aufgabe: eine Route vom Start zum Ziel malen.
+     - Das Raumschiff fliegt nur nach rechts, nie zurück (die Linie folgt dem Finger nur vorwärts).
+     - Berührt die Linie ein Hindernis, bricht sie ab; „RÜCKGÄNGIG“ nimmt die letzten Meter zurück.
+     - Die Route muss am START beginnen und kann nur an ihrer leuchtenden Spitze weitergemalt werden.
+     - Am Ziel startet „SIMULATION STARTEN“ einen Probeflug (die Aliens fliegen noch nicht wirklich los).
+   „NOCH EINMAL“ erzeugt eine neue Strecke für die Nächsten.
+   Betriebsarten: FLIEGEN (Himmel bewegen: wischen, Pfeiltasten, Mausrad) und MALEN (Route zeichnen;
+   am Bildschirmrand weiterziehen, um weiterzufliegen).
+   Welt-Einheiten: die Bildschirmhöhe entspricht 1000 Einheiten, dadurch ist die Strecke auf jedem Gerät gleich.
+   Felder: backTo, trackLength (Länge in Einheiten), gap (freie Durchflugbreite), shipRadius, undoLength
    ====================================================================== */
 registerModule("sky", (ctx) => {
   const S = ctx.step;
-  const minLength = S.minLength ?? 500;
+  const TRACK = S.trackLength ?? 3400;
+  const GAP = S.gap ?? 240;
+  const SHIP_R = S.shipRadius ?? 14;
+  const UNDO_LEN = S.undoLength ?? 160;
+  const START_X = 90, START_ZONE = 190;      // Start: Linie bei 90, die Route muss links von 190 beginnen
+  const GOAL_X = TRACK - 90;
+  const WORLD_H = 1000;
 
   /* ----- Oberfläche ----- */
   const canvas = document.createElement("canvas");
@@ -782,42 +795,102 @@ registerModule("sky", (ctx) => {
     topParts.push(back);
   }
   topParts.push(hint);
+  const topEl = h("div", "sky-top", "", topParts);
 
-  const flyBtn = h("button", "", "FLIEGEN"); flyBtn.type = "button";
-  const drawBtn = h("button", "", "MALEN"); drawBtn.type = "button";
+  const mk = (cls, label) => { const b = h("button", cls, label); b.type = "button"; return b; };
+  const flyBtn = mk("", "FLIEGEN"), drawBtn = mk("", "MALEN");
   const modeBar = h("div", "sky-mode", "", [flyBtn, drawBtn]);
-  const againBtn = h("button", "ghost", "NOCH EINMAL"); againBtn.type = "button";
-  const sendBtn = h("button", "go", "ROUTE SENDEN"); sendBtn.type = "button";
-  const nextBtn = h("button", "go", "WEITER ›"); nextBtn.type = "button"; nextBtn.hidden = true;
-  const actions = h("div", "sky-actions", "", [againBtn, sendBtn, nextBtn]);
+  const undoBtn = mk("ghost", "↶ RÜCKGÄNGIG");
+  const clearBtn = mk("ghost", "LÖSCHEN");
+  const sendBtn = mk("go", "SIMULATION STARTEN");
+  const againBtn = mk("ghost", "NOCH EINMAL");
+  const nextBtn = mk("go", "WEITER ›");
+  nextBtn.hidden = true;
+  const actions = h("div", "sky-actions", "", [undoBtn, clearBtn, againBtn, sendBtn, nextBtn]);
+  const barEl = h("div", "sky-bar", "", [modeBar, actions]);
 
-  ctx.root.append(h("div", "sky-screen", "", [canvas, h("div", "sky-top", "", topParts), h("div", "sky-bar", "", [modeBar, actions])]));
+  ctx.root.append(h("div", "sky-screen", "", [canvas, topEl, barEl]));
 
   /* ----- Zustand ----- */
-  let W = 0, H = 0, dpr = 1;
-  let cam = 0, camVel = 0, camSpeed = 0, lastCam = 0;      // Kamera (seitliche Verschiebung) und ihre Geschwindigkeit
+  let W = 0, H = 0, dpr = 1, s = 1, oy = 0;                // Bildschirm, Maßstab (Pixel je Einheit), oberer Rand des Spielfelds
+  let cam = 0, camVel = 0, camSpeed = 0, lastCamPx = 0;    // Kamera in Welt-Einheiten
   let mode = "fly";                                        // fly | draw
   let phase = "draw";                                      // draw | flying | done
-  let strokes = [];                                        // gemalte Linien, Punkte in Welt-Koordinaten { x, y }
-  let length = 0;                                          // Gesamtlänge der Route in Pixeln
-  let particles = [];
-  let shooting = null;
+  let route = [];                                          // Punkte der Route (Welt-Einheiten)
+  let length = 0;
+  let crashed = null;                                      // { x, y } wenn die Spitze an einem Hindernis steht
+  let complete = false;
+  let particles = [], bursts = [], shooting = null;
   let drag = null;
-  let idle = true;                                         // solange noch nichts angefasst wurde, driftet der Himmel sanft
-  let flight = null;
-  let ufo = null;
+  let flight = null, ufo = null;
+  let flashText = "", flashUntil = 0;
+  let field = null;
   let raf = 0, last = 0, uiSig = "";
   const keys = { left: false, right: false };
   const g = canvas.getContext("2d");
 
   const mod = (a, n) => ((a % n) + n) % n;
+  const unitsWide = () => W / s;
+  const clampCam = () => { cam = clamp(cam, -40, Math.max(-40, TRACK + 40 - unitsWide())); };
 
-  /* Sternenschichten: f = Parallaxe (vorne schnell, hinten langsam), n = Anzahl, r = Größe, a = Helligkeit */
+  /* ----- Strecke mit Hindernissen ----- */
+  function rng(seed) {
+    let a = seed >>> 0;
+    return () => { a += 0x6D2B79F5; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+
+  /** Erzeugt Asteroiden und Kometen: Jede „Wand“ aus Hindernissen lässt eine Lücke frei, deren Mitte
+      zufällig wandert. Die Lückenmitten (gapPath) sind der garantierte Lösungsweg. */
+  function makeField(seed) {
+    const r = rng(seed);
+    const obstacles = [];
+    const gapPath = [{ x: START_X, y: 500 }];
+    let gy = 500;
+    const add = (x, y, rad) => {
+      const comet = r() < 0.22;
+      obstacles.push({
+        x, y, r: rad, comet,
+        rot: r() * 6.28, spin: (r() - 0.5) * 0.5,
+        shape: Array.from({ length: 12 }, () => 0.82 + r() * 0.3),
+        crater: [r() * 6.28, r() * 6.28],
+        tail: 0.7 + r() * 0.5, dir: Math.PI + (r() - 0.5) * 1.2
+      });
+    };
+    for (let x = 520; x < GOAL_X - 320; x += 330 + r() * 70) {
+      gy = clamp(gy + (r() - 0.5) * 360, 270, 730);
+      gapPath.push({ x, y: gy });
+      for (const dir of [-1, 1]) {                       // oben (-1) und unten (+1) bis über den Rand hinaus auffüllen
+        let edge = gy + dir * GAP / 2;
+        for (let i = 0; i < 12; i++) {
+          const rad = 55 + r() * 40;
+          const cy = edge + dir * rad * 0.8;
+          add(x + (r() - 0.5) * 50, cy, rad);
+          edge = cy + dir * rad * 0.8;
+          if ((dir < 0 && edge < -60) || (dir > 0 && edge > WORLD_H + 60)) break;
+        }
+      }
+    }
+    gapPath.push({ x: GOAL_X, y: gapPath[gapPath.length - 1].y });
+
+    // Garantierter Lösungsweg: durch die Lückenmitte, dann im freien Streifen zwischen zwei Wänden senkrecht zur nächsten Lücke
+    const solution = [{ x: 60, y: 500 }];
+    for (let k = 1; k < gapPath.length - 1; k++) {
+      const prev = gapPath[k - 1], cur = gapPath[k];
+      const mid = (prev.x + cur.x) / 2;
+      solution.push({ x: mid, y: prev.y }, { x: mid, y: cur.y }, { x: cur.x, y: cur.y });
+    }
+    const lastGap = gapPath[gapPath.length - 2];
+    solution.push({ x: (lastGap.x + GOAL_X) / 2, y: lastGap.y }, { x: GOAL_X + 10, y: lastGap.y });
+    return { seed, obstacles, gapPath, solution };
+  }
+  const hits = (x, y) => field.obstacles.some((o) => Math.hypot(x - o.x, y - o.y) < o.r * 0.92 + SHIP_R);
+  let seedCounter = (S.seed ?? (Date.now() & 0xffff)) >>> 0;
+  field = makeField(seedCounter);
+
+  /* ----- Sterne (Bildschirm-Schichten) ----- */
   const LAYERS = [
-    { f: 0.12, n: 90, r: 0.7, a: 0.45 },
-    { f: 0.35, n: 70, r: 1.1, a: 0.65 },
-    { f: 0.8, n: 45, r: 1.7, a: 0.85 },
-    { f: 1.5, n: 22, r: 2.6, a: 1 }
+    { f: 0.12, n: 90, r: 0.7, a: 0.45 }, { f: 0.35, n: 70, r: 1.1, a: 0.65 },
+    { f: 0.8, n: 45, r: 1.7, a: 0.85 }, { f: 1.5, n: 22, r: 2.6, a: 1 }
   ];
   const COLORS = ["#ffffff", "#ffffff", "#9dffc4", "#00f0ff"];
   const stars = LAYERS.map((L) => Array.from({ length: L.n }, () => ({
@@ -829,32 +902,76 @@ registerModule("sky", (ctx) => {
     { u: 0.45, v: 0.85, r: 0.5, c: "150,60,255", a: 0.08, f: 0.06 }
   ];
 
+  /* ----- Layout: Spielfeld zwischen Hinweiszeile oben und Werkzeugleiste unten ----- */
   function resize() {
     dpr = Math.min(window.devicePixelRatio || 1, 2);
     W = canvas.clientWidth; H = canvas.clientHeight;
     canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    const top = topEl.getBoundingClientRect().bottom + 8;
+    const bottom = H - barEl.getBoundingClientRect().top + 8;
+    const avail = Math.max(120, H - top - bottom);
+    s = avail / WORLD_H;
+    oy = top;
+    clampCam();
   }
   window.addEventListener("resize", resize);
 
-  /* ----- Route ----- */
-  function newStroke(p) {
-    const s = [p];
-    s.minX = p.x; s.maxX = p.x;
-    return s;
+  /* ----- Hilfen ----- */
+  const toWorld = (x, y) => ({ x: x / s + cam, y: (y - oy) / s });
+  const toScreen = (wx, wy) => ({ x: (wx - cam) * s, y: oy + wy * s });
+  function flash(text) { flashText = text; flashUntil = performance.now() + 1800; hint.textContent = text; uiSig = ""; }
+  function burst(x, y, color, n = 28) {
+    bursts.push({ x, y, t: 0, color });
+    for (let i = 0; i < n; i++) spark(x, y, 2.6, color);
   }
-  function addPoint(stroke, p) {
-    const q = stroke[stroke.length - 1];
-    length += Math.hypot(p.x - q.x, p.y - q.y);
-    stroke.push(p);
-    if (p.x < stroke.minX) stroke.minX = p.x;
-    if (p.x > stroke.maxX) stroke.maxX = p.x;
+  function spark(x, y, power = 1, color) {
+    if (particles.length > 300) return;
+    const a = Math.random() * 6.28, v = (20 + Math.random() * 70) * power;
+    particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, max: 0.5 + Math.random() * 0.8, c: color || (Math.random() < 0.5 ? "0,240,255" : "0,255,102") });
   }
-  const pointCount = () => strokes.reduce((n, s) => n + s.length, 0);
 
-  function spark(x, y, power = 1) {
-    if (particles.length > 260) return;
-    const a = Math.random() * 6.28, v = (10 + Math.random() * 40) * power;
-    particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, max: 0.5 + Math.random() * 0.8, c: Math.random() < 0.5 ? "0,240,255" : "0,255,102" });
+  /* ----- Route zeichnen: nur vorwärts, mit Hinderniserkennung ----- */
+  function advanceTo(p) {
+    if (!route.length || crashed || complete) return;
+    const head = route[route.length - 1];
+    if (p.x < head.x - 45) flash("NUR NACH RECHTS – ZURÜCK GEHT NICHT");
+    const tx = clamp(Math.max(p.x, head.x), 0, TRACK - 20);
+    const ty = clamp(p.y, 14, WORLD_H - 14);
+    const dist = Math.hypot(tx - head.x, ty - head.y);
+    const steps = Math.ceil(dist / 5);
+    for (let i = 1; i <= steps; i++) {
+      const q = { x: head.x + ((tx - head.x) * i) / steps, y: head.y + ((ty - head.y) * i) / steps };
+      if (hits(q.x, q.y)) {
+        crashed = { x: q.x, y: q.y };
+        burst(q.x, q.y, "255,59,92");
+        flash("KOLLISION! – MIT „RÜCKGÄNGIG“ ZURÜCK UND ANDERS WEITER");
+        break;
+      }
+      const prev = route[route.length - 1];
+      length += Math.hypot(q.x - prev.x, q.y - prev.y);
+      route.push(q);
+      if (route.length % 4 === 0) spark(q.x, q.y);
+      if (q.x >= GOAL_X) { complete = true; flashText = ""; burst(q.x, q.y, "0,255,102", 40); vibrateOnce(); break; }
+    }
+    refreshUI();
+  }
+
+  function undo() {
+    if (phase !== "draw" || !route.length) return;
+    let removed = 0;
+    while (route.length > 1 && removed < UNDO_LEN) {
+      const a = route.pop(), b = route[route.length - 1];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      removed += d; length -= d;
+    }
+    if (route.length <= 1) { route = []; length = 0; }
+    crashed = null; complete = false; flashText = "";
+    refreshUI();
+  }
+  function clearRoute() {
+    if (phase !== "draw") return;
+    route = []; length = 0; crashed = null; complete = false; drag = null; flashText = "";
+    refreshUI();
   }
 
   /* ----- Eingabe ----- */
@@ -865,88 +982,85 @@ registerModule("sky", (ctx) => {
     e.preventDefault();
     try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* nicht überall möglich */ }
     const p = pt(e);
-    idle = false;
     camVel = 0;
-    drag = { id: e.pointerId, x: p.x, y: p.y, t: performance.now(), stroke: null };
-    if (mode === "draw" && pointCount() < 4000) {
-      drag.stroke = newStroke({ x: p.x + cam, y: p.y });
-      strokes.push(drag.stroke);
+    drag = { id: e.pointerId, x: p.x, y: p.y, t: performance.now(), active: false };
+    if (mode !== "draw") return;
+
+    const w = toWorld(p.x, p.y);
+    if (!route.length) {
+      if (w.x > START_ZONE) { flash("DIE ROUTE MUSS AM START (LINKS) BEGINNEN"); return; }
+      route = [{ x: clamp(w.x, 10, START_ZONE), y: clamp(w.y, 14, WORLD_H - 14) }];
+      length = 0; drag.active = true;
+      if (hits(route[0].x, route[0].y)) { crashed = { ...route[0] }; }
+      refreshUI();
+    } else if (complete) {
+      flash("ZIEL ERREICHT – SIMULATION STARTEN");
+    } else if (crashed) {
+      flash("KOLLISION! – ERST MIT „RÜCKGÄNGIG“ ZURÜCK");
+    } else if (Math.hypot(w.x - route[route.length - 1].x, w.y - route[route.length - 1].y) <= 90) {
+      drag.active = true;
+    } else {
+      flash("MALT BEI DER LEUCHTENDEN SPITZE WEITER");
     }
   });
   canvas.addEventListener("pointermove", (e) => {
     if (!drag || drag.id !== e.pointerId) return;
     const p = pt(e), now = performance.now();
     if (mode === "fly") {
-      const dx = p.x - drag.x;
+      const dx = (p.x - drag.x) / s;
       cam -= dx;
+      clampCam();
       camVel = camVel * 0.6 + ((-dx / Math.max(1, now - drag.t)) * 1000) * 0.4;
     }
     drag.x = p.x; drag.y = p.y; drag.t = now;
-    if (mode === "draw") extendStroke();
+    if (mode === "draw" && drag.active) { const w = toWorld(p.x, p.y); advanceTo(w); }
   });
   const endDrag = (e) => { if (drag && drag.id === e.pointerId) { drag = null; refreshUI(); } };
   canvas.addEventListener("pointerup", endDrag);
   canvas.addEventListener("pointercancel", endDrag);
   canvas.addEventListener("wheel", (e) => {
     e.preventDefault();
-    idle = false;
-    cam += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    cam += (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) / s;
+    clampCam();
   }, { passive: false });
 
   function onKey(e, down) {
     const k = e.key;
     if (k === "ArrowLeft" || k === "a" || k === "A") keys.left = down;
     else if (k === "ArrowRight" || k === "d" || k === "D") keys.right = down;
-    else return;
-    idle = false;
   }
   const onKeyDown = (e) => onKey(e, true);
   const onKeyUp = (e) => onKey(e, false);
   window.addEventListener("keydown", onKeyDown);
   window.addEventListener("keyup", onKeyUp);
 
-  /** Hängt dem aktuellen Strich einen Punkt an der Fingerposition an (läuft bei Bewegung und jedes Bild) */
-  function extendStroke() {
-    if (!drag || !drag.stroke) return;
-    const p = { x: drag.x + cam, y: drag.y };
-    const q = drag.stroke[drag.stroke.length - 1];
-    if (Math.hypot(p.x - q.x, p.y - q.y) > 4 && pointCount() < 4000) {
-      addPoint(drag.stroke, p);
-      spark(p.x, p.y);
-      refreshUI();
-    }
-  }
-
-  /* ----- Betriebsart und Knöpfe ----- */
-  function setMode(next) {
-    if (phase !== "draw") return;
-    mode = next;
-    idle = false;
-    refreshUI();
-  }
+  /* ----- Knöpfe ----- */
+  function setMode(next) { if (phase === "draw") { mode = next; refreshUI(); } }
   flyBtn.addEventListener("click", () => setMode("fly"));
   drawBtn.addEventListener("click", () => setMode("draw"));
-
-  function reset() {
-    strokes = []; length = 0; particles = []; flight = null; ufo = null; drag = null;
-    phase = "draw"; mode = "draw";
-    refreshUI();
-  }
-  againBtn.addEventListener("click", reset);
+  undoBtn.addEventListener("click", undo);
+  clearBtn.addEventListener("click", clearRoute);
   nextBtn.addEventListener("click", () => ctx.next());
 
-  function sendRoute() {
-    if (phase !== "draw" || length < minLength) return;
-    const pts = strokes.flat();
+  /** „NOCH EINMAL“: neue Strecke für die Nächsten */
+  againBtn.addEventListener("click", () => {
+    seedCounter += 7919;
+    field = makeField(seedCounter);
+    route = []; length = 0; crashed = null; complete = false; particles = []; bursts = []; flight = null; ufo = null; drag = null;
+    phase = "draw"; mode = "draw"; cam = 0; camVel = 0;
+    refreshUI();
+  });
+
+  sendBtn.addEventListener("click", () => {
+    if (phase !== "draw" || !complete || crashed) return;
+    const pts = route.slice();
     const cum = [0];
     for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
     const total = cum[cum.length - 1];
-    flight = { pts, cum, total, t: 0, dur: clamp(total / 260, 3, 8) };
-    phase = "flying";
-    drag = null;
+    flight = { pts, cum, total, t: 0, dur: clamp(total / 380, 4, 10) };
+    phase = "flying"; drag = null;
     refreshUI();
-  }
-  sendBtn.addEventListener("click", sendRoute);
+  });
 
   function sampleFlight(f, d) {
     let i = 1;
@@ -958,84 +1072,93 @@ registerModule("sky", (ctx) => {
 
   /** Texte und Knöpfe passend zum Zustand (nur wenn sich etwas geändert hat) */
   function refreshUI() {
-    const ready = length >= minLength;
-    const sig = [mode, phase, ready, strokes.length].join("|");
+    const ready = complete && !crashed;
+    const sig = [mode, phase, ready, !!crashed, route.length > 0].join("|");
     if (sig === uiSig) return;
     uiSig = sig;
+    if (phase !== "draw") flashText = "";          // veraltete Kurzmeldungen stören den Probeflug nicht
 
     flyBtn.classList.toggle("on", mode === "fly");
     drawBtn.classList.toggle("on", mode === "draw");
     flyBtn.disabled = drawBtn.disabled = phase !== "draw";
-    sendBtn.hidden = phase !== "draw";
+    const drawing = phase === "draw";
+    undoBtn.hidden = clearBtn.hidden = !drawing;
+    undoBtn.disabled = clearBtn.disabled = !route.length;
+    sendBtn.hidden = !drawing;
     sendBtn.disabled = !ready;
+    againBtn.hidden = drawing;
+    againBtn.disabled = phase === "flying";
     nextBtn.hidden = phase !== "done";
-    againBtn.disabled = phase === "flying" || (phase === "draw" && strokes.length === 0);
 
     let text;
-    if (phase === "flying") text = "ROUTE WIRD ÜBERMITTELT …";
-    else if (phase === "done") text = "ROUTE ÜBERMITTELT – DIE KARTE DER ALIENS IST AKTUALISIERT ✔";
-    else if (mode === "fly") text = "WISCHT SEITLICH, UM DURCH DEN STERNENHIMMEL ZU FLIEGEN";
-    else if (!strokes.length) text = "MALT EINE ROUTE FÜR DAS RAUMSCHIFF – AM RAND WEITERZIEHEN, UM WEITERZUFLIEGEN";
-    else if (!ready) text = "ROUTE NOCH ZU KURZ – MALT WEITER";
-    else text = "ROUTE BEREIT – SENDEN ODER WEITERMALEN";
-    hint.textContent = text;
+    if (phase === "flying") text = "SIMULATION LÄUFT …";
+    else if (phase === "done") text = "SIMULATION ERFOLGREICH – DIE ROUTE IST SICHER ✔";
+    else if (crashed) text = "KOLLISION! – MIT „RÜCKGÄNGIG“ ZURÜCK UND ANDERS WEITER";
+    else if (ready) text = "ZIEL ERREICHT – SIMULATION STARTEN";
+    else if (mode === "fly") text = "WISCHT SEITLICH ÜBER DIE STRECKE – LINKS IST DER START, RECHTS DAS ZIEL";
+    else if (!route.length) text = "MALT VOM START (LINKS) ZUM ZIEL (RECHTS) – NUR NACH RECHTS, KEIN HINDERNIS BERÜHREN";
+    else text = "MALT BEI DER LEUCHTENDEN SPITZE WEITER – ZUM ZIEL RECHTS";
+    hint.textContent = flashText && performance.now() < flashUntil ? flashText : text;
   }
 
   /* ----- Bewegung ----- */
-  function update(dt, now) {
-    // Kamera: Tasten, Auslaufen nach dem Wischen, sanftes Treiben am Anfang
+  function update(dt) {
     const keyDir = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
-    if (keyDir && phase !== "flying") cam += keyDir * 650 * dt;
+    if (keyDir && phase !== "flying") cam += (keyDir * 650 * dt) / s;
     if (!drag && Math.abs(camVel) > 2) { cam += camVel * dt; camVel *= Math.pow(0.05, dt); } else if (!drag) camVel = 0;
-    if (idle && phase === "draw") cam += 16 * dt;
 
-    // Malen: Punkte anhängen, am Rand weiterfliegen
-    if (drag && drag.stroke && mode === "draw") {
-      if (drag.x < 70) cam -= (70 - drag.x) * 9 * dt;
-      else if (drag.x > W - 70) cam += (drag.x - (W - 70)) * 9 * dt;
-      extendStroke();
+    // Malen: am Rand weiterfliegen, die Spitze folgt dem Finger
+    if (drag && drag.active && mode === "draw") {
+      if (drag.x < 70) cam -= ((70 - drag.x) * 9 * dt) / s;
+      else if (drag.x > W - 70) cam += ((drag.x - (W - 70)) * 9 * dt) / s;
+      clampCam();
+      advanceTo(toWorld(drag.x, drag.y));
     }
 
-    // Flug des Raumschiffs entlang der Route; die Kamera folgt (so ziehen die Sterne vorbei)
+    // Probeflug: das Raumschiff folgt der Route, die Kamera folgt dem Raumschiff
     if (phase === "flying" && flight) {
       flight.t += dt;
       const k = clamp(flight.t / flight.dur, 0, 1);
       const eased = k * k * (3 - 2 * k);
       ufo = sampleFlight(flight, eased * flight.total);
-      cam += (ufo.x - W * 0.4 - cam) * (1 - Math.exp(-dt * 4));
+      cam += (ufo.x - unitsWide() * 0.4 - cam) * (1 - Math.exp(-dt * 4));
       spark(ufo.x, ufo.y, 1.4); spark(ufo.x, ufo.y, 1.4);
       if (k >= 1) {
         phase = "done";
         vibrateOnce();
-        for (let i = 0; i < 40; i++) spark(ufo.x, ufo.y, 3);
+        burst(ufo.x, ufo.y, "0,255,102", 40);
         refreshUI();
       }
     }
+    clampCam();
 
-    camSpeed = camSpeed * 0.8 + ((cam - lastCam) / Math.max(dt, 0.001)) * 0.2;
-    lastCam = cam;
+    camSpeed = camSpeed * 0.8 + (((cam * s) - lastCamPx) / Math.max(dt, 0.001)) * 0.2;
+    lastCamPx = cam * s;
 
     particles.forEach((p) => { p.life += dt; p.x += p.vx * dt; p.y += p.vy * dt; });
     particles = particles.filter((p) => p.life < p.max);
+    bursts.forEach((b) => { b.t += dt; });
+    bursts = bursts.filter((b) => b.t < 0.9);
 
-    // gelegentlich eine Sternschnuppe
     if (!shooting && Math.random() < dt * 0.15) {
       shooting = { x: Math.random() * W, y: Math.random() * H * 0.4, vx: 380 + Math.random() * 220, vy: 120 + Math.random() * 120, life: 0 };
     }
     if (shooting) { shooting.life += dt; shooting.x += shooting.vx * dt; shooting.y += shooting.vy * dt; if (shooting.life > 0.9) shooting = null; }
 
+    if (flashText && performance.now() > flashUntil) { flashText = ""; uiSig = ""; }
     refreshUI();
   }
 
   /* ----- Zeichnen ----- */
   function drawSky(t) {
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
     const bg = g.createLinearGradient(0, 0, 0, H);
     bg.addColorStop(0, "#02030c"); bg.addColorStop(1, "#050914");
     g.fillStyle = bg;
     g.fillRect(0, 0, W, H);
 
     NEBULAE.forEach((n) => {
-      const x = mod(n.u * W * 1.6 - cam * n.f, W * 1.6) - W * 0.3;
+      const x = mod(n.u * W * 1.6 - cam * s * n.f, W * 1.6) - W * 0.3;
       const y = n.v * H, r = n.r * Math.max(W, H);
       const grad = g.createRadialGradient(x, y, 0, x, y, r);
       grad.addColorStop(0, `rgba(${n.c},${n.a})`); grad.addColorStop(1, `rgba(${n.c},0)`);
@@ -1045,14 +1168,13 @@ registerModule("sky", (ctx) => {
 
     LAYERS.forEach((L, li) => {
       const streak = clamp(Math.abs(camSpeed) * L.f * 0.012, 0, 26);
-      stars[li].forEach((s) => {
-        const x = mod(s.u * W - cam * L.f, W);
-        const y = s.v * H;
-        const tw = 0.75 + 0.25 * Math.sin(t * 0.002 * (1 + li) + s.p);
-        g.globalAlpha = L.a * tw;
-        g.fillStyle = s.c;
+      stars[li].forEach((st) => {
+        const x = mod(st.u * W - cam * s * L.f, W);
+        const y = st.v * H;
+        g.globalAlpha = L.a * (0.75 + 0.25 * Math.sin(t * 0.002 * (1 + li) + st.p));
+        g.fillStyle = st.c;
         if (streak > 2) {
-          g.strokeStyle = s.c; g.lineWidth = L.r;
+          g.strokeStyle = st.c; g.lineWidth = L.r;
           g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.sign(camSpeed) * streak, y); g.stroke();
         }
         g.beginPath(); g.arc(x, y, L.r, 0, 6.283); g.fill();
@@ -1061,65 +1183,145 @@ registerModule("sky", (ctx) => {
     g.globalAlpha = 1;
 
     if (shooting) {
-      const a = 1 - shooting.life / 0.9;
-      g.strokeStyle = `rgba(255,255,255,${a})`; g.lineWidth = 2;
+      g.strokeStyle = `rgba(255,255,255,${1 - shooting.life / 0.9})`; g.lineWidth = 2;
       g.beginPath(); g.moveTo(shooting.x, shooting.y); g.lineTo(shooting.x - shooting.vx * 0.12, shooting.y - shooting.vy * 0.12); g.stroke();
     }
   }
 
-  function drawRoute() {
+  /** Alles in Welt-Einheiten: Strecke, Hindernisse, Route */
+  function drawWorld(t) {
+    g.setTransform(dpr * s, 0, 0, dpr * s, -cam * s * dpr, oy * dpr);
+
+    // Bereiche außerhalb der Strecke abdunkeln (Begrenzung links und rechts)
+    g.fillStyle = "rgba(2, 3, 10, 0.78)";
+    const vTop = -oy / s, vH = H / s;
+    if (cam < 0) g.fillRect(cam, vTop, -cam, vH);
+    if (cam + unitsWide() > TRACK) g.fillRect(TRACK, vTop, cam + unitsWide() - TRACK, vH);
+
+    // Start- und Ziellinie
+    g.lineWidth = 3; g.setLineDash([14, 12]);
+    g.strokeStyle = "rgba(0, 255, 102, 0.8)";
+    g.beginPath(); g.moveTo(START_X, 0); g.lineTo(START_X, WORLD_H); g.stroke();
+    g.strokeStyle = complete ? "rgba(0, 255, 102, 1)" : "rgba(0, 240, 255, 0.8)";
+    g.beginPath(); g.moveTo(GOAL_X, 0); g.lineTo(GOAL_X, WORLD_H); g.stroke();
+    g.setLineDash([]);
+    g.fillStyle = "rgba(0, 255, 102, 0.07)"; g.fillRect(START_X, 0, START_ZONE - START_X, WORLD_H);
+    g.fillStyle = "rgba(0, 240, 255, 0.07)"; g.fillRect(GOAL_X, 0, TRACK - GOAL_X, WORLD_H);
+    g.font = "bold 30px 'Courier New', monospace"; g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillStyle = "rgba(0, 255, 102, 0.9)"; g.fillText("START", START_X + 50, 40);
+    g.fillStyle = "rgba(0, 240, 255, 0.9)"; g.fillText("ZIEL", GOAL_X + 45, 40);
+    g.font = "bold 44px 'Courier New', monospace";
+    g.fillText("▶", START_X + 48, WORLD_H / 2 - 4);
+
+    // Hindernisse
+    const x0 = cam - 200, x1 = cam + unitsWide() + 200;
+    field.obstacles.forEach((o) => {
+      if (o.x < x0 || o.x > x1) return;
+      if (o.comet) drawComet(o, t); else drawRock(o, t);
+    });
+
+    // Route
     g.lineCap = "round"; g.lineJoin = "round";
-    g.globalCompositeOperation = "lighter";
-    const passes = [[16, "rgba(0, 240, 255, 0.10)"], [7, "rgba(0, 255, 140, 0.30)"], [2.6, "rgba(235, 255, 245, 0.95)"]];
-    strokes.forEach((s) => {
-      if (s.maxX - cam < -40 || s.minX - cam > W + 40) return;
+    if (route.length) {
+      g.globalCompositeOperation = "lighter";
+      const passes = [[16, "rgba(0, 240, 255, 0.10)"], [7, "rgba(0, 255, 140, 0.30)"], [2.6, "rgba(235, 255, 245, 0.95)"]];
       passes.forEach(([width, color]) => {
         g.lineWidth = width; g.strokeStyle = color;
         g.beginPath();
-        s.forEach((p, i) => (i ? g.lineTo(p.x - cam, p.y) : g.moveTo(p.x - cam, p.y)));
-        if (s.length === 1) g.lineTo(s[0].x - cam + 0.1, s[0].y);
+        route.forEach((p, i) => (i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)));
+        if (route.length === 1) g.lineTo(route[0].x + 0.1, route[0].y);
         g.stroke();
       });
-    });
-    g.globalCompositeOperation = "source-over";
-
-    // Startpunkt der Route
-    const first = strokes[0] && strokes[0][0];
-    if (first) {
-      g.strokeStyle = "rgba(0, 240, 255, 0.9)"; g.lineWidth = 2;
-      g.beginPath(); g.arc(first.x - cam, first.y, 9, 0, 6.283); g.stroke();
+      g.globalCompositeOperation = "source-over";
     }
-  }
 
-  function drawParticles() {
+    // Spitze der Route (dort wird weitergemalt)
+    if (route.length && phase === "draw" && !complete) {
+      const head = route[route.length - 1];
+      const pulse = 0.6 + 0.4 * Math.sin(t * 0.006);
+      g.fillStyle = crashed ? `rgba(255, 59, 92, ${pulse})` : `rgba(0, 240, 255, ${pulse})`;
+      g.shadowColor = crashed ? "#ff3b5c" : "#00f0ff"; g.shadowBlur = 22;
+      g.beginPath(); g.arc(head.x, head.y, 11, 0, 6.283); g.fill();
+      g.shadowBlur = 0;
+      g.strokeStyle = crashed ? "rgba(255, 59, 92, 0.9)" : "rgba(0, 240, 255, 0.8)"; g.lineWidth = 3;
+      g.beginPath(); g.arc(head.x, head.y, 22 + 5 * pulse, 0, 6.283); g.stroke();
+    }
+    // Start der Route
+    if (!route.length && phase === "draw" && mode === "draw") {
+      g.strokeStyle = "rgba(0, 255, 102, 0.9)"; g.lineWidth = 3; g.setLineDash([10, 8]);
+      g.beginPath(); g.arc(START_X + 50, WORLD_H / 2, 60, 0, 6.283); g.stroke(); g.setLineDash([]);
+    }
+
+    // Funken und Aufschläge
     g.globalCompositeOperation = "lighter";
     particles.forEach((p) => {
       const a = 1 - p.life / p.max;
       g.fillStyle = `rgba(${p.c},${a * 0.9})`;
-      g.beginPath(); g.arc(p.x - cam, p.y, 1.2 + a * 2, 0, 6.283); g.fill();
+      g.beginPath(); g.arc(p.x, p.y, 2.5 + a * 3.5, 0, 6.283); g.fill();
+    });
+    bursts.forEach((b) => {
+      const a = 1 - b.t / 0.9;
+      g.strokeStyle = `rgba(${b.color},${a})`; g.lineWidth = 5;
+      g.beginPath(); g.arc(b.x, b.y, 15 + b.t * 150, 0, 6.283); g.stroke();
     });
     g.globalCompositeOperation = "source-over";
+
+    drawUfo(t);
+  }
+
+  function drawRock(o, t) {
+    g.save();
+    g.translate(o.x, o.y);
+    g.rotate(o.rot + t * 0.0001 * o.spin);
+    g.beginPath();
+    o.shape.forEach((k, i) => {
+      const a = (i / o.shape.length) * 6.283;
+      i ? g.lineTo(Math.cos(a) * o.r * k, Math.sin(a) * o.r * k) : g.moveTo(Math.cos(a) * o.r * k, Math.sin(a) * o.r * k);
+    });
+    g.closePath();
+    const grad = g.createRadialGradient(-o.r * 0.3, -o.r * 0.3, o.r * 0.1, 0, 0, o.r);
+    grad.addColorStop(0, "#2a3b36"); grad.addColorStop(1, "#0d1714");
+    g.fillStyle = grad; g.fill();
+    g.strokeStyle = "rgba(0, 255, 102, 0.55)"; g.lineWidth = 3; g.stroke();
+    g.fillStyle = "rgba(0, 0, 0, 0.35)";
+    o.crater.forEach((a, i) => { g.beginPath(); g.arc(Math.cos(a) * o.r * 0.35, Math.sin(a) * o.r * 0.35, o.r * (0.14 + i * 0.05), 0, 6.283); g.fill(); });
+    g.restore();
+  }
+
+  function drawComet(o, t) {
+    const tail = o.r * 4.4 * o.tail;
+    const tx = o.x + Math.cos(o.dir) * tail, ty = o.y + Math.sin(o.dir) * tail;
+    const grad = g.createLinearGradient(o.x, o.y, tx, ty);
+    grad.addColorStop(0, "rgba(120, 255, 255, 0.55)"); grad.addColorStop(1, "rgba(0, 240, 255, 0)");
+    g.fillStyle = grad;
+    const nx = -Math.sin(o.dir) * o.r * 0.9, ny = Math.cos(o.dir) * o.r * 0.9;
+    g.beginPath(); g.moveTo(o.x + nx, o.y + ny); g.lineTo(tx, ty); g.lineTo(o.x - nx, o.y - ny); g.closePath(); g.fill();
+    const glow = g.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.r * 1.5);
+    glow.addColorStop(0, "rgba(220, 255, 255, 0.9)"); glow.addColorStop(0.45, "rgba(0, 240, 255, 0.45)"); glow.addColorStop(1, "rgba(0, 240, 255, 0)");
+    g.fillStyle = glow;
+    g.beginPath(); g.arc(o.x, o.y, o.r * 1.5, 0, 6.283); g.fill();
+    g.fillStyle = "#e9ffff";
+    g.beginPath(); g.arc(o.x, o.y, o.r * 0.62 * (0.95 + 0.05 * Math.sin(t * 0.004 + o.rot)), 0, 6.283); g.fill();
   }
 
   function drawUfo(t) {
     if (!ufo) return;
-    const x = ufo.x - cam, y = ufo.y;
-    const glow = g.createRadialGradient(x, y, 0, x, y, 46);
+    const glow = g.createRadialGradient(ufo.x, ufo.y, 0, ufo.x, ufo.y, 70);
     glow.addColorStop(0, "rgba(0, 255, 140, 0.45)"); glow.addColorStop(1, "rgba(0, 255, 140, 0)");
     g.fillStyle = glow;
-    g.fillRect(x - 46, y - 46, 92, 92);
+    g.fillRect(ufo.x - 70, ufo.y - 70, 140, 140);
     g.save();
-    g.translate(x, y);
+    g.translate(ufo.x, ufo.y);
     g.rotate(clamp(Math.sin(ufo.angle) * 0.35, -0.35, 0.35));
     g.fillStyle = "rgba(0, 240, 255, 0.65)";
-    g.beginPath(); g.ellipse(0, -6, 10, 8, 0, Math.PI, 0); g.fill();
+    g.beginPath(); g.ellipse(0, -9, 15, 12, 0, Math.PI, 0); g.fill();
     g.fillStyle = "#b9cfc7";
-    g.beginPath(); g.ellipse(0, 0, 24, 7.5, 0, 0, 6.283); g.fill();
-    g.strokeStyle = "#00ff66"; g.lineWidth = 1.5;
-    g.beginPath(); g.ellipse(0, 0, 24, 7.5, 0, 0, 6.283); g.stroke();
+    g.beginPath(); g.ellipse(0, 0, 36, 11, 0, 0, 6.283); g.fill();
+    g.strokeStyle = "#00ff66"; g.lineWidth = 2.2;
+    g.beginPath(); g.ellipse(0, 0, 36, 11, 0, 0, 6.283); g.stroke();
     for (let i = -1; i <= 1; i++) {
       g.fillStyle = (Math.floor(t / 180) + i) % 2 ? "#00f0ff" : "#00ff66";
-      g.beginPath(); g.arc(i * 12, 1, 2, 0, 6.283); g.fill();
+      g.beginPath(); g.arc(i * 18, 1.5, 3, 0, 6.283); g.fill();
     }
     g.restore();
   }
@@ -1130,14 +1332,12 @@ registerModule("sky", (ctx) => {
     const dt = last ? Math.min((t - last) / 1000, 0.1) : 0;
     last = t;
     if (!W || !H) { resize(); return; }
-    update(dt, t);
-    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    update(dt);
     drawSky(t);
-    drawRoute();
-    drawParticles();
-    drawUfo(t);
+    drawWorld(t);
   }
 
+  resize();
   refreshUI();
   raf = requestAnimationFrame(frame);
 
@@ -1148,22 +1348,47 @@ registerModule("sky", (ctx) => {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
     },
-    /* nur für die Debug-Seite und Tests: Zeit vorspulen (die Bewegung läuft sonst über die Bildwiederholung) */
-    debugTick(seconds = 1) {
-      for (let s = 0; s < seconds; s += 1 / 60) update(1 / 60, performance.now());
-    },
-    /* nur für die Debug-Seite: eine Beispiel-Route malen */
+    /* nur für die Debug-Seite und Tests */
+    debugTick(seconds = 1) { for (let t = 0; t < seconds; t += 1 / 60) update(1 / 60); },
+    debugScreen: (wx, wy) => toScreen(wx, wy),
+    /** malt eine gültige Route (den garantierten Lösungsweg) vom Start bis zum Ziel */
     debugDraw() {
       if (phase !== "draw") return;
-      const pts = [{ x: 60 + cam, y: H * 0.5 }];
-      strokes = [newStroke(pts[0])]; length = 0;
-      for (let x = 66; x < W * 1.9; x += 6) addPoint(strokes[0], { x: x + cam, y: H * 0.5 + Math.sin(x / 90) * H * 0.18 });
-      mode = "draw"; idle = false;
+      route = [{ x: 60, y: 500 }]; length = 0; crashed = null; complete = false; flashText = "";
+      mode = "draw";
+      field.solution.forEach((p) => advanceTo(p));
       refreshUI();
     },
+    /** fährt geradeaus in das erste Hindernis (zum Testen der Kollision) */
+    debugCrash() {
+      if (phase !== "draw") return;
+      route = [{ x: 60, y: 500 }]; length = 0; crashed = null; complete = false;
+      mode = "draw";
+      const target = field.obstacles.filter((o) => Math.abs(o.y - 500) < 140).sort((a, b) => a.x - b.x)[0] || field.obstacles[0];
+      advanceTo({ x: target.x + target.r + 40, y: target.y });
+      refreshUI();
+    },
+    /** prüft für viele Startwerte, dass der Lösungsweg lückenlos frei von Hindernissen ist (Anzahl der Fehler) */
+    debugCheckFields(count = 100) {
+      let bad = 0;
+      const keep = field;
+      for (let i = 0; i < count && !bad; i++) {
+        field = makeField(1000 + i * 31);
+        for (let k = 1; k < field.solution.length && !bad; k++) {
+          const a = field.solution[k - 1], b = field.solution[k];
+          const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 4));
+          for (let j = 0; j <= n; j++) if (hits(a.x + ((b.x - a.x) * j) / n, a.y + ((b.y - a.y) * j) / n)) { bad++; break; }
+        }
+      }
+      field = keep;
+      return bad;
+    },
     info: () => ({
-      type: "sky", phase, mode, length: Math.round(length), minLength, strokes: strokes.length, cam: Math.round(cam),
-      width: W, starX: LAYERS.map((L, li) => mod(stars[li][0].u * W - cam * L.f, W))   // erste Stern je Schicht (zeigt die Parallaxe)
+      type: "sky", phase, mode, length: Math.round(length), complete, crashed: !!crashed,
+      head: route.length ? route[route.length - 1] : null, routePoints: route.length,
+      cam: Math.round(cam), width: W, scale: s, track: TRACK, startX: START_X, startZone: START_ZONE, goalX: GOAL_X,
+      obstacles: field.obstacles.length, seed: field.seed, gapPath: field.gapPath,
+      starX: LAYERS.map((L, li) => mod(stars[li][0].u * W - cam * s * L.f, W))
     })
   };
 });

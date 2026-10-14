@@ -21,9 +21,11 @@
                                                  maxFails (so oft hintereinander falsch → alles neu gemischt), button, backTo,
                                                  showSpeakers (false = „Marktweib 1/2“ ausblenden), texts (eigene Meldungen),
                                                  confirmDe (eigenes Bestätigungsfenster beim Wechsel auf Deutsch)
-     sky       Sternenhimmel: seitlich wischen (Parallaxe) und eine Route für das Raumschiff malen, „ROUTE SENDEN“ lässt es sie
-               abfliegen, „NOCH EINMAL“ erlaubt eine neue Route (füllt den Bildschirm, kein Scrollen).
-                                                 Felder: backTo (id: Ziel des „‹ ZURÜCK“-Knopfs), minLength (Mindestlänge der Route in Pixeln)
+     sky       Navigations-Aufgabe am Sternenhimmel: eine Route von links (Start) nach rechts (Ziel) malen, vorbei an Kometen
+               und Asteroiden; das Raumschiff fliegt nur nach rechts, Berührung bricht die Linie ab, „RÜCKGÄNGIG“/„LÖSCHEN“,
+               am Ziel „SIMULATION STARTEN“, „NOCH EINMAL“ erzeugt eine neue Strecke (füllt den Bildschirm, kein Scrollen).
+                                                 Felder: backTo (id: Ziel des „‹ ZURÜCK“-Knopfs), trackLength (Länge der Strecke, Standard 3400),
+                                                 gap (freie Durchflugbreite, Standard 240 – kleiner = schwerer), shipRadius, undoLength, seed
      end       Abschlussseite.                   Felder: md
 
    Gemeinsame Felder:
@@ -58,8 +60,10 @@
      T15  Der belauschte Streit (Anleitung)  content/35e6e118.md   fertig
      T16  Aufzeichnung rekonstruiert (Gespräch) content/e6a5e05c.md   fertig
      T18  Aliens schicken euch weiter (Westen)  content/84e2cf1f.md   Platzhalter   (Bild B13: a9897d02.png)
-     T19  Signal gefunden (Auftrag)          content/14a6b5ec.md   Platzhalter   (Bild B14: 28ccfcba.jpg)
-     T20  Karte aktualisiert                 content/413e9fcd.md   Platzhalter   (Bild B15: 2c931172.png)
+     T19  Eine Sternkarte (Kunst-Relikt)     content/14a6b5ec.md   Platzhalter   (Bild B14: 28ccfcba.jpg)
+     T21  Schaut euch die Karte an           content/f5e0f468.md   Platzhalter
+     T22  Ihr übernehmt die Navigation       content/6105ac99.md   fertig
+     T20  Simulation erfolgreich                 content/413e9fcd.md   Platzhalter   (Bild B15: 2c931172.png)
      T09  Ende (VORLÄUFIG)                   content/0845e9c6.md   Platzhalter   (Bild B09: a6db5dd6.jpg)
 
    Es gibt keine Obergrenze für Schritte: lieber jedes Detail als eigenen Schritt anlegen, dann lässt sich
@@ -176,12 +180,16 @@ const STEPS = [
     status: "platzhalter", todo: "Text und Bild prüfen/ersetzen" },
   { id: "ort8", type: "locate", title: "Ort 8 (ca. 50 m westlich der Marktweiber)", lat: 47.7622598458167, lng: 8.842276178706632, status: "fertig",
     todo: "Koordinaten vor Ort prüfen (waren nicht ganz genau bekannt)" },
-  /* Ankunft bei Ort 8: erst Text (was ist zu tun), dann die Aufgabe am Sternenhimmel, dann wieder Text. */
-  { id: "story-9", type: "info", title: "Signal gefunden: abgestürztes UFO, Auftrag (T19)", md: "14a6b5ec", button: "ZUM STERNENHIMMEL",
-    status: "platzhalter", todo: "Text prüfen/ersetzen" },
-  { id: "sternenhimmel", type: "sky", title: "Sternenhimmel: Route für das Raumschiff malen", backTo: "story-9", minLength: 500, status: "fertig",
-    todo: "auf echten Handys testen (Wischen/Malen, Tempo)" },
-  { id: "story-10", type: "info", title: "Karte aktualisiert (T20)", md: "413e9fcd", button: "WEITER",
+  /* Ankunft bei Ort 8: Dort liegt kein UFO, sondern eine veraltete Sternkarte – ein öffentliches Kunstobjekt (Relikt).
+     Ablauf: Story → Karte in Ruhe ansehen (herumgehen) → Auftrag „Navigation“ → Aufgabe am Sternenhimmel → Story. */
+  { id: "story-9", type: "info", title: "Eine Sternkarte: veraltetes Kunst-Relikt (T19)", md: "14a6b5ec", button: "WEITER",
+    status: "platzhalter", todo: "Text prüfen/ersetzen (Name/Beschreibung des echten Kunstobjekts einsetzen)" },
+  { id: "karte-ansehen", type: "info", title: "Schaut euch die Karte an: herumgehen (T21)", md: "f5e0f468", button: "WEITER",
+    status: "platzhalter", todo: "Fragen zum echten Kunstobjekt anpassen" },
+  { id: "navigation-auftrag", type: "info", title: "Ihr übernehmt die Navigation: Auftrag (T22)", md: "6105ac99", button: "ZUR NAVIGATION", status: "fertig" },
+  { id: "sternenhimmel", type: "sky", title: "Navigation: Route von links nach rechts planen", backTo: "navigation-auftrag", status: "fertig",
+    todo: "auf echten Handys testen (Wischen/Malen, Schwierigkeit: gap, trackLength)" },
+  { id: "story-10", type: "info", title: "Simulation erfolgreich (T20)", md: "413e9fcd", button: "WEITER",
     status: "platzhalter", todo: "Text und Bild ersetzen; Geschichte weiterentwickeln" },
   /* Die Geschichte ist noch nicht zu Ende: weitere Schritte kommen zwischen story-10 und ende.
      Das Ende selbst ist vorläufig. */

@@ -140,10 +140,11 @@
       <section data-for="sky" hidden>
         <h2>Sternenhimmel</h2>
         <div class="row">
-          <button type="button" id="skyDraw">Beispiel-Route malen</button>
+          <button type="button" id="skyDraw">Gültige Route malen</button>
+          <button type="button" id="skyCrash">In Hindernis fliegen</button>
           <button type="button" id="skyTick">5 s vorspulen</button>
         </div>
-        <p class="hint" style="margin-top:8px">Danach „Haupt-Button drücken“ (Route senden, später Weiter). „NOCH EINMAL“ und die Betriebsarten bedienst du im Telefon-Fenster.</p>
+        <p class="hint" style="margin-top:8px">Danach „Haupt-Button drücken“ (Simulation starten, später Weiter). Rückgängig, Löschen und die Betriebsarten bedienst du im Telefon-Fenster.</p>
       </section>
 
       <section class="warn">
@@ -330,8 +331,9 @@
   }));
 
   /* ---------- Sternenhimmel ---------- */
+  $("skyCrash").addEventListener("click", () => act("Sternenhimmel", () => { ev("current.instance.debugCrash()"); log("Route in ein Hindernis gesteuert."); }));
   $("skyTick").addEventListener("click", () => act("Sternenhimmel", () => { ev("current.instance.debugTick(5)"); log("5 Sekunden vorgespult."); }));
-  $("skyDraw").addEventListener("click", () => act("Sternenhimmel", () => { ev("current.instance.debugDraw()"); log("Beispiel-Route gemalt."); }));
+  $("skyDraw").addEventListener("click", () => act("Sternenhimmel", () => { ev("current.instance.debugDraw()"); log("Gültige Route gemalt."); }));
 
   /* ---------- Dialog-Aufgabe ---------- */
   $("dlgSolve").addEventListener("click", () => act("Dialog", () => { ev("current.instance.debugSolve()"); log("Dialog richtig sortiert und geprüft."); }));
@@ -352,7 +354,7 @@
         if (!fake.active) setFake(s.step.lat - mToLat(150), s.step.lng);
         stepToward(s.step, Number($("stepM").value) || 12);
       } else if (t === "sky") {
-        if (s.info.phase === "draw" && s.info.length < s.info.minLength) ev("current.instance.debugDraw()");
+        if (s.info.phase === "draw" && !s.info.complete) ev("current.instance.debugDraw()");
         else if (s.info.phase === "flying") ev("current.instance.debugTick(1.5)");
         else if (mainButton()) pressMain();
       } else if (t === "dialog") {
@@ -448,7 +450,7 @@
       lines.push(`Kompass: ${s.heading === null ? "–" : Math.round(s.heading) + "°"}`);
     }
     if (s.step.type === "sky" && s.info) {
-      lines.push(`Phase: ${s.info.phase}   Betriebsart: ${s.info.mode === "fly" ? "fliegen" : "malen"}   Route: ${s.info.length} / ${s.info.minLength} px   Kamera: ${s.info.cam}`);
+      lines.push(`Phase: ${s.info.phase}   Betriebsart: ${s.info.mode === "fly" ? "fliegen" : "malen"}   Route: ${s.info.length} Einheiten   Ziel erreicht: ${s.info.complete ? "ja" : "nein"}   Kollision: ${s.info.crashed ? "JA" : "nein"}   Hindernisse: ${s.info.obstacles}`);
     }
     if (s.step.type === "dialog" && s.info) {
       lines.push(`Sprache: ${s.info.lang === "sw" ? "Schwäbisch" : "Deutsch"}   Fehlversuche in Folge: ${s.info.fails} / ${s.info.maxFails}   Reihenfolge: ${s.info.order.map((i) => i + 1).join(" ")}`);
